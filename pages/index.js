@@ -2,53 +2,21 @@ import { useState, useRef, useEffect } from "react";
 
 const TRANSLATIONS = {
   ru: {
-    appName: "SalesAI",
-    appDesc: "Тренажёр продаж",
-    step1: "Шаг 1 из 3",
-    step2: "Шаг 2 из 3",
-    step3: "Шаг 3 из 3",
-    chooseLang: "Выберите язык",
-    chooseNiche: "Выберите нишу",
-    nicheDesc: "AI подстроит покупателя под ваш бизнес",
-    chooseStage: "Этап продаж",
-    niche: "Ниша",
-    finish: "Завершить →",
-    buyer: "Покупатель",
-    placeholder: "Ваш ответ покупателю...",
-    analyzing: "⏳ Анализирую диалог...",
-    detail: "Детальная оценка",
-    best: "✓ Лучший момент",
-    worst: "✗ Главная ошибка",
-    tip: "→ Совет",
-    retry: "🔄 Повторить",
-    newScene: "⚡ Новый сценарий",
-    back: "← Назад",
-    outOf: "из 10",
+    appName: "SalesAI", appDesc: "Тренажёр продаж", step1: "Шаг 1 из 2", step2: "Шаг 2 из 2",
+    chooseNiche: "Выберите нишу", nicheDesc: "AI подстроит покупателя под ваш бизнес",
+    chooseStage: "Этап продаж", niche: "Ниша", finish: "Завершить →", buyer: "Покупатель",
+    placeholder: "Ваш ответ покупателю...", analyzing: "⏳ Анализирую диалог...",
+    detail: "Детальная оценка", best: "✓ Лучший момент", worst: "✗ Главная ошибка",
+    tip: "→ Совет", retry: "🔄 Повторить", newScene: "⚡ Новый сценарий", back: "← Назад", outOf: "из 10",
     verdicts: { "Отлично": "Отлично", "Хорошо": "Хорошо", "Нужна практика": "Нужна практика", "Слабо": "Слабо" },
   },
   kz: {
-    appName: "SalesAI",
-    appDesc: "Сату жаттықтырушысы",
-    step1: "1/3 қадам",
-    step2: "2/3 қадам",
-    step3: "3/3 қадам",
-    chooseLang: "Тілді таңдаңыз",
-    chooseNiche: "Нишаны таңдаңыз",
-    nicheDesc: "AI сатып алушыны сіздің бизнесіңізге бейімдейді",
-    chooseStage: "Сату кезеңі",
-    niche: "Ниша",
-    finish: "Аяқтау →",
-    buyer: "Сатып алушы",
-    placeholder: "Сатып алушыға жауабыңыз...",
-    analyzing: "⏳ Диалогты талдап жатырмын...",
-    detail: "Толық баға",
-    best: "✓ Үздік сәт",
-    worst: "✗ Басты қате",
-    tip: "→ Кеңес",
-    retry: "🔄 Қайталау",
-    newScene: "⚡ Жаңа сценарий",
-    back: "← Артқа",
-    outOf: "10-нан",
+    appName: "SalesAI", appDesc: "Сату жаттықтырушысы", step1: "1/2 қадам", step2: "2/2 қадам",
+    chooseNiche: "Нишаны таңдаңыз", nicheDesc: "AI сатып алушыны сіздің бизнесіңізге бейімдейді",
+    chooseStage: "Сату кезеңі", niche: "Ниша", finish: "Аяқтау →", buyer: "Сатып алушы",
+    placeholder: "Сатып алушыға жауабыңыз...", analyzing: "⏳ Диалогты талдап жатырмын...",
+    detail: "Толық баға", best: "✓ Үздік сәт", worst: "✗ Басты қате",
+    tip: "→ Кеңес", retry: "🔄 Қайталау", newScene: "⚡ Жаңа сценарий", back: "← Артқа", outOf: "10-нан",
     verdicts: { "Отлично": "Өте жақсы", "Хорошо": "Жақсы", "Нужна практика": "Жаттығу керек", "Слабо": "Нашар" },
   }
 };
@@ -99,26 +67,43 @@ const CRITERIA = {
 
 function buildSystemPrompt(niche, stage, lang) {
   const nicheLabel = NICHES[lang].find(n => n.id === niche)?.label || niche;
-  const langInstruction = lang === 'kz' ? 'Тек қазақ тілінде жауап бер.' : 'Отвечай только на русском языке.';
 
-  const instructions = {
-    ru: {
-      contact: `Ты — покупатель в ${nicheLabel}. Только зашёл. Веди себя нейтрально. На вялое приветствие отвечай коротко, на энергичное — открывайся.`,
-      needs: `Ты — покупатель в ${nicheLabel} с потребностью которую сам не осознаёшь. Раскрывайся только на хорошие вопросы.`,
-      presentation: `Ты — скептичный покупатель в ${nicheLabel}. Если говорят о свойствах без выгод — спрашивай "и что мне с этого?".`,
-      objections: `Ты — покупатель в ${nicheLabel}. Начни с возражения "Дорого" или "Я подумаю". Смягчайся только на хорошие аргументы.`,
-      closing: `Ты — покупатель в ${nicheLabel} почти готовый купить. Жди пока менеджер предложит оформить.`,
-    },
-    kz: {
-      contact: `Сен — ${nicheLabel} дүкеніндегі сатып алушысың. Жаңа келдің. Бейтарап бол. Қуатты сәлемге ашылып кет.`,
-      needs: `Сен — ${nicheLabel} дүкенінің сатып алушысысың. Қажеттілігің бар бірақ өзің де толық білмейсің. Тек жақсы сұрақтарға жауап бер.`,
-      presentation: `Сен — ${nicheLabel} дүкенінің скептик сатып алушысысың. Қасиеттер айтса пайдасын сұра.`,
-      objections: `Сен — ${nicheLabel} дүкенінің сатып алушысысың. "Қымбат" немесе "Ойланамын" деп баста. Жақсы дәлелдерге ғана жұмсар.`,
-      closing: `Сен — ${nicheLabel} дүкенінде сатып алуға дайын тұрған сатып алушысысың. Менеджер ұсынғанша күт.`,
-    }
+  if (lang === 'kz') {
+    const scenarios = {
+      contact: `Сіз ${nicheLabel} дүкенінің тұтынушысысыз. Жаңа келдіңіз. Бейтарап күйде тұрсыз. Менеджер жақсы сәлемдессе — сөйлесуге ашылыңыз. Нашар сәлемдессе — қысқа жауап беріңіз.`,
+      needs: `Сіз ${nicheLabel} дүкенінің тұтынушысысыз. Бір нәрсе алғыңыз келеді, бірақ нақты не керектігін толық айта алмайсыз. Тек жақсы, нақты сұрақтарға ғана жауап беріңіз.`,
+      presentation: `Сіз ${nicheLabel} дүкенінің скептик тұтынушысысыз. Менеджер тауар туралы айтып жатыр. Тек қасиеттер айтса — "Маған бұл не береді?" деп сұраңыз. Нақты пайданы естісеңіз — қызығыңыз артсын.`,
+      objections: `Сіз ${nicheLabel} дүкенінің тұтынушысысыз. Бірінші сөзіңіз: "Қымбат екен" немесе "Ойланып көрейін". Менеджер жақсы дәлелдер келтірсе ғана жұмсарыңыз. Кем дегенде 2-3 дәлел керек.`,
+      closing: `Сіз ${nicheLabel} дүкенінде сатып алуға дерлік дайынсыз, бірақ менеджер тікелей ұсыныс жасамаса — кетіп қалғыңыз келеді. Менеджер "Рәсімдейік" десе — келісіңіз.`,
+    };
+    return `${scenarios[stage]}
+
+МАҢЫЗДЫ ЕРЕЖЕЛЕР:
+- Тек таза, дұрыс қазақ тілінде жазыңыз. Орыс сөздерін қолданбаңыз.
+- Қысқа жауап беріңіз — 1-2 сөйлем ғана.
+- Өзіңіздің рөліңізді ешқашан түсіндірмеңіз — тек тұтынушы болыңыз.
+- 6 хабарламадан кейін шешім қабылдаңыз.
+- Менеджер жақсы жұмыс жасаса — "Жарайды, рәсімдеңіз" деңіз.
+- Менеджер нашар жұмыс жасаса — "Жоқ, басқа жерге барамын" деңіз.`;
+  }
+
+  const scenarios = {
+    contact: `Ты — покупатель в ${nicheLabel}. Только зашёл. Веди себя нейтрально. На вялое приветствие отвечай коротко, на энергичное — открывайся.`,
+    needs: `Ты — покупатель в ${nicheLabel} с потребностью которую сам до конца не осознаёшь. Раскрывайся только на хорошие конкретные вопросы.`,
+    presentation: `Ты — скептичный покупатель в ${nicheLabel}. Если говорят о свойствах без выгод — спрашивай "и что мне с этого?". На конкретные выгоды реагируй положительно.`,
+    objections: `Ты — покупатель в ${nicheLabel}. Начни с "Дорого" или "Я подумаю". Смягчайся только на хорошие аргументы. Нужно минимум 2-3 аргумента.`,
+    closing: `Ты — покупатель в ${nicheLabel} почти готовый купить. Жди пока менеджер предложит оформить. Если не предлагает — уходи. На прямое предложение соглашайся.`,
   };
 
-  return `${instructions[lang][stage]}\n\nЕРЕЖЕЛЕР/ПРАВИЛА:\n- ${langInstruction}\n- Қысқа жауап бер / Отвечай коротко 1-3 предложения\n- 6 хабарламадан кейін шешім қабылда / После 6 сообщений прими решение`;
+  return `${scenarios[stage]}
+
+ПРАВИЛА:
+- Отвечай только на русском языке.
+- Коротко — 1-2 предложения.
+- Никогда не объясняй свою роль — просто будь покупателем.
+- После 6 сообщений прими решение.
+- Если менеджер хорошо справился — "Хорошо, оформляйте".
+- Если плохо — "Нет, пойду в другое место".`;
 }
 
 function buildEvalPrompt(stage, lang) {
@@ -126,8 +111,10 @@ function buildEvalPrompt(stage, lang) {
   const labels = CRITERIA[stage][lang];
   const ex = {};
   keys.forEach(k => ex[k] = 5);
-  const langNote = lang === 'kz' ? 'bestMoment, worstMoment, tip өрістерін қазақша жаз.' : 'Поля bestMoment, worstMoment, tip пиши на русском.';
-  return `Ты тренер по продажам. Оцени МЕНЕДЖЕРА. Критерии: ${keys.map((k,i) => k+'('+labels[i]+')').join(', ')}. ${langNote} Ответь ТОЛЬКО JSON: ${JSON.stringify({scores: ex, totalScore: 5, verdict: "Хорошо", bestMoment: "текст", worstMoment: "текст", tip: "текст"})}`;
+  const note = lang === 'kz'
+    ? 'bestMoment, worstMoment, tip өрістерін таза қазақ тілінде жаз.'
+    : 'Поля bestMoment, worstMoment, tip пиши на русском.';
+  return `Ты тренер по продажам. Оцени МЕНЕДЖЕРА. Критерии: ${keys.map((k,i) => k+'('+labels[i]+')').join(', ')}. ${note} Ответь ТОЛЬКО JSON без markdown: ${JSON.stringify({scores: ex, totalScore: 5, verdict: "Хорошо", bestMoment: "текст", worstMoment: "текст", tip: "текст"})}`;
 }
 
 async function askClaude(system, history) {
@@ -171,14 +158,11 @@ export default function Home() {
 
   const t = TRANSLATIONS[lang];
 
-  function chooseLang(l) { setLang(l); setStep('niche'); }
-
-  function startChat(selectedStage, selectedLang) {
-    const l = selectedLang || lang;
+  function startChat(selectedStage) {
     const firstMsg = {
-      ru: { contact: 'Здравствуйте', needs: 'Привет, хочу кое-что купить', presentation: 'Расскажите про ваш продукт', objections: 'Интересно, но дорого...', closing: 'Ну в принципе понятно, надо подумать' },
-      kz: { contact: 'Сәлеметсіз бе', needs: 'Сәлем, бірдеңе алғым келеді', presentation: 'Өніміңіз туралы айтыңызшы', objections: 'Қызықты, бірақ қымбат...', closing: 'Түсінікті, ойланып көрейін' },
-    }[l][selectedStage];
+      ru: { contact: 'Здравствуйте', needs: 'Привет, хочу кое-что купить', presentation: 'Расскажите про ваш продукт', objections: 'Интересно, но дорого...', closing: 'Ну понятно, надо подумать' },
+      kz: { contact: 'Сәлеметсіз бе', needs: 'Сәлем, бір нәрсе алғым келеді', presentation: 'Өніміңіз туралы айтыңызшы', objections: 'Қызықты, бірақ қымбат екен...', closing: 'Түсінікті, ойланып көрейін' },
+    }[lang][selectedStage];
     setHistory([{ from: 'client', text: firstMsg }]);
     setStep('chat');
     setTimeout(() => inputRef.current?.focus(), 100);
@@ -235,8 +219,6 @@ export default function Home() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#0a0f1e', color: '#e2e8f0', fontFamily: 'Inter,system-ui,sans-serif', display: 'flex', flexDirection: 'column' }}>
-
-      {/* Header */}
       <div style={{ background: '#0f172a', borderBottom: '1px solid #1e293b', padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 12 }}>
         <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg,#3b82f6,#8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>⚡</div>
         <div>
@@ -252,19 +234,18 @@ export default function Home() {
         )}
       </div>
 
-      {/* LANG */}
       {step === 'lang' && (
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
           <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 52, marginBottom: 20 }}>⚡</div>
+            <div style={{ fontSize: 52, marginBottom: 16 }}>⚡</div>
             <h1 style={{ fontSize: 24, fontWeight: 800, marginBottom: 8 }}>SalesAI</h1>
-            <p style={{ color: '#64748b', marginBottom: 32 }}>Тренажёр продаж / Сату жаттықтырушысы</p>
+            <p style={{ color: '#64748b', marginBottom: 32, fontSize: 14 }}>Тренажёр продаж / Сату жаттықтырушысы</p>
             <div style={{ display: 'flex', gap: 16, justifyContent: 'center' }}>
-              <button onClick={() => chooseLang('ru')} style={{ background: '#0f172a', border: '2px solid #3b82f6', borderRadius: 14, padding: '20px 32px', cursor: 'pointer', color: '#e2e8f0' }}>
+              <button onClick={() => { setLang('ru'); setStep('niche'); }} style={{ background: '#0f172a', border: '2px solid #3b82f6', borderRadius: 14, padding: '20px 32px', cursor: 'pointer', color: '#e2e8f0' }}>
                 <div style={{ fontSize: 32, marginBottom: 8 }}>🇷🇺</div>
                 <div style={{ fontWeight: 700, fontSize: 16 }}>Русский</div>
               </button>
-              <button onClick={() => chooseLang('kz')} style={{ background: '#0f172a', border: '2px solid #10b981', borderRadius: 14, padding: '20px 32px', cursor: 'pointer', color: '#e2e8f0' }}>
+              <button onClick={() => { setLang('kz'); setStep('niche'); }} style={{ background: '#0f172a', border: '2px solid #10b981', borderRadius: 14, padding: '20px 32px', cursor: 'pointer', color: '#e2e8f0' }}>
                 <div style={{ fontSize: 32, marginBottom: 8 }}>🇰🇿</div>
                 <div style={{ fontWeight: 700, fontSize: 16 }}>Қазақша</div>
               </button>
@@ -273,7 +254,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* NICHE */}
       {step === 'niche' && (
         <div style={{ flex: 1, padding: '32px 20px', maxWidth: 600, margin: '0 auto', width: '100%' }}>
           <div style={{ marginBottom: 32 }}>
@@ -294,7 +274,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* STAGE */}
       {step === 'stage' && (
         <div style={{ flex: 1, padding: '32px 20px', maxWidth: 600, margin: '0 auto', width: '100%' }}>
           <div style={{ marginBottom: 32 }}>
@@ -318,7 +297,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* CHAT */}
       {(step === 'chat' || step === 'evaluating') && (
         <>
           <div style={{ flex: 1, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -349,7 +327,6 @@ export default function Home() {
         </>
       )}
 
-      {/* RESULT */}
       {step === 'result' && result && (
         <div style={{ flex: 1, overflowY: 'auto', padding: '20px 16px' }}>
           <div style={{ maxWidth: 500, margin: '0 auto' }}>
