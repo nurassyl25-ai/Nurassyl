@@ -6,6 +6,10 @@ export default async function handler(req, res) {
 
   try {
     const { messages, system } = req.body;
+    
+    // Фильтруем пустые сообщения
+    const cleanMessages = messages.filter(m => m.content && m.content.trim() !== '');
+    
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -17,7 +21,7 @@ export default async function handler(req, res) {
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 500,
         system,
-        messages
+        messages: cleanMessages
       })
     });
     const data = await response.json();
