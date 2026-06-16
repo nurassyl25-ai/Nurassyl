@@ -1,5 +1,15 @@
 import { useState, useRef, useEffect } from "react";
 
+// КОДЫ ДОСТУПА — добавляйте сюда коды для каждого клиента
+const ACCESS_CODES = [
+  "SALES2024",
+  "BAQSHAHO",
+  "PARTNER01",
+  "PARTNER02",
+  "PARTNER03",
+  "DEMO123",
+];
+
 const NICHES = [
   { id: "retail", label: "Розничный магазин", emoji: "🛒", examples: "одежда, электроника, продукты" },
   { id: "food", label: "Кафе / Ресторан", emoji: "☕", examples: "доставка, меню, столики" },
@@ -34,15 +44,7 @@ function buildSystemPrompt(niche, stage) {
     objections: `Ты — покупатель в ${nicheLabel}. Начни с "Дорого" или "Я подумаю". Смягчайся только на хорошие аргументы. Нужно минимум 2-3 аргумента.`,
     closing: `Ты — покупатель в ${nicheLabel} почти готовый купить. Жди пока менеджер предложит оформить. Если не предлагает — уходи. На прямое предложение соглашайся.`,
   };
-  return `${scenarios[stage]}
-
-ПРАВИЛА:
-- Отвечай только на русском языке.
-- Коротко — 1-2 предложения.
-- Никогда не объясняй свою роль — просто будь покупателем.
-- После 6 сообщений прими решение.
-- Если менеджер хорошо справился — "Хорошо, оформляйте".
-- Если плохо — "Нет, пойду в другое место".`;
+  return `${scenarios[stage]}\n\nПРАВИЛА:\n- Отвечай только на русском языке.\n- Коротко — 1-2 предложения.\n- Никогда не объясняй свою роль — просто будь покупателем.\n- После 6 сообщений прими решение.\n- Если менеджер хорошо справился — "Хорошо, оформляйте".\n- Если плохо — "Нет, пойду в другое место".`;
 }
 
 function buildEvalPrompt(stage) {
@@ -78,7 +80,9 @@ function Bar({ label, value }) {
 }
 
 export default function Home() {
-  const [step, setStep] = useState('niche');
+  const [step, setStep] = useState('login');
+  const [codeInput, setCodeInput] = useState('');
+  const [codeError, setCodeError] = useState('');
   const [niche, setNiche] = useState('');
   const [stage, setStage] = useState('');
   const [history, setHistory] = useState([]);
@@ -89,6 +93,16 @@ export default function Home() {
   const inputRef = useRef();
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [history, loading]);
+
+  function handleLogin() {
+    const code = codeInput.trim().toUpperCase();
+    if (ACCESS_CODES.includes(code)) {
+      setStep('niche');
+      setCodeError('');
+    } else {
+      setCodeError('Неверный код доступа. Обратитесь к организатору.');
+    }
+  }
 
   function startChat(selectedStage) {
     const firstMsg = {
@@ -149,6 +163,8 @@ export default function Home() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#0a0f1e', color: '#e2e8f0', fontFamily: 'Inter,system-ui,sans-serif', display: 'flex', flexDirection: 'column' }}>
+
+      {/* Header */}
       <div style={{ background: '#0f172a', borderBottom: '1px solid #1e293b', padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 12 }}>
         <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg,#3b82f6,#8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>⚡</div>
         <div>
@@ -164,6 +180,33 @@ export default function Home() {
         )}
       </div>
 
+      {/* LOGIN */}
+      {step === 'login' && (
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+          <div style={{ maxWidth: 360, width: '100%', textAlign: 'center' }}>
+            <div style={{ fontSize: 52, marginBottom: 16 }}>🔐</div>
+            <h1 style={{ fontSize: 22, fontWeight: 800, marginBottom: 8 }}>Введите код доступа</h1>
+            <p style={{ color: '#64748b', fontSize: 14, marginBottom: 28 }}>Код выдаётся при покупке доступа</p>
+            <input
+              value={codeInput}
+              onChange={e => setCodeInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleLogin()}
+              placeholder="Например: SALES2024"
+              style={{ width: '100%', background: '#0f172a', border: `1px solid ${codeError ? '#ef4444' : '#1e293b'}`, borderRadius: 10, color: '#e2e8f0', fontSize: 16, padding: '12px 16px', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box', textAlign: 'center', letterSpacing: 2, marginBottom: 12 }}
+            />
+            {codeError && <p style={{ color: '#ef4444', fontSize: 13, marginBottom: 12 }}>{codeError}</p>}
+            <button
+              onClick={handleLogin}
+              disabled={!codeInput.trim()}
+              style={{ width: '100%', background: codeInput.trim() ? '#1d4ed8' : '#1e293b', color: '#fff', border: 'none', borderRadius: 10, padding: '13px', fontSize: 15, fontWeight: 700, cursor: codeInput.trim() ? 'pointer' : 'default' }}
+            >
+              Войти →
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* NICHE */}
       {step === 'niche' && (
         <div style={{ flex: 1, padding: '32px 20px', maxWidth: 600, margin: '0 auto', width: '100%' }}>
           <div style={{ marginBottom: 32 }}>
@@ -184,6 +227,7 @@ export default function Home() {
         </div>
       )}
 
+      {/* STAGE */}
       {step === 'stage' && (
         <div style={{ flex: 1, padding: '32px 20px', maxWidth: 600, margin: '0 auto', width: '100%' }}>
           <div style={{ marginBottom: 32 }}>
@@ -207,6 +251,7 @@ export default function Home() {
         </div>
       )}
 
+      {/* CHAT */}
       {(step === 'chat' || step === 'evaluating') && (
         <>
           <div style={{ flex: 1, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -237,6 +282,7 @@ export default function Home() {
         </>
       )}
 
+      {/* RESULT */}
       {step === 'result' && result && (
         <div style={{ flex: 1, overflowY: 'auto', padding: '20px 16px' }}>
           <div style={{ maxWidth: 500, margin: '0 auto' }}>
