@@ -35,38 +35,22 @@ const STAGE_CRITERIA_LABELS = {
 
 function buildSystemPrompt(niche, stage) {
   const nicheLabel = NICHES.find(n => n.id === niche)?.label || niche;
-  const stageLabel = STAGES.find(s => s.id === stage)?.label || stage;
-
   const stageInstructions = {
-    contact: `Ты — потенциальный покупатель в ${nicheLabel}. Ты только зашёл/написал. Веди себя нейтрально — не холодно, не горячо. Жди пока менеджер установит контакт. Если менеджер приветствует вяло или шаблонно — отвечай коротко и без интереса. Если энергично и по-человечески — начинай открываться.`,
-    needs: `Ты — покупатель в ${nicheLabel} с конкретной потребностью которую сам до конца не осознаёшь. Не говори сразу что хочешь — жди пока менеджер спросит. Раскрывайся постепенно только на хорошие вопросы. На закрытые вопросы отвечай кратко "да/нет".`,
-    presentation: `Ты — покупатель в ${nicheLabel} который слушает презентацию. Ты скептичен — тебе нужны конкретные выгоды, а не характеристики. Если менеджер говорит про свойства без выгод — спрашивай "и что мне с этого?". Реагируй на то что важно именно тебе.`,
-    objections: `Ты — покупатель в ${nicheLabel} с возражениями. Начни с "Дорого" или "Я подумаю". Не сдавайся сразу — требуй минимум 2-3 аргумента. На шаблонные ответы давай новые возражения. На хорошие аргументы постепенно смягчайся.`,
-    closing: `Ты — покупатель в ${nicheLabel} который почти готов купить но тебя нужно подтолкнуть. Жди пока менеджер предложит оформить. Если не предлагает — уходи в раздумья. На прямое предложение с ценностью — соглашайся.`,
+    contact: `Ты — потенциальный покупатель в ${nicheLabel}. Ты только зашёл/написал. Веди себя нейтрально. Если менеджер приветствует вяло — отвечай коротко. Если энергично — начинай открываться.`,
+    needs: `Ты — покупатель в ${nicheLabel} с потребностью которую сам не осознаёшь. Не говори сразу что хочешь. Раскрывайся только на хорошие вопросы.`,
+    presentation: `Ты — покупатель в ${nicheLabel} который слушает презентацию. Ты скептичен. Если менеджер говорит про свойства без выгод — спрашивай "и что мне с этого?".`,
+    objections: `Ты — покупатель в ${nicheLabel}. Твоё первое возражение: "Дорого" или "Я подумаю". Не сдавайся сразу. На хорошие аргументы постепенно смягчайся.`,
+    closing: `Ты — покупатель в ${nicheLabel} который почти готов купить. Жди пока менеджер предложит оформить. Если не предлагает — уходи в раздумья.`,
   };
-
-  return `${stageInstructions[stage]}
-
-ПРАВИЛА:
-- Отвечай коротко 1-3 предложения как в реальном чате
-- Говори естественно, не как робот
-- После 6-7 сообщений от менеджера — прими финальное решение
-- Если менеджер справился хорошо — скажи что-то позитивное
-- Если плохо — уйди или откажи
-- Ниша: ${nicheLabel}, этап: ${stageLabel}`;
+  return `${stageInstructions[stage]}\n\nПРАВИЛА:\n- Отвечай коротко 1-3 предложения\n- После 6 сообщений от менеджера прими финальное решение\n- Говори естественно`;
 }
 
 function buildEvalPrompt(stage) {
   const criteria = STAGE_CRITERIA[stage];
   const labels = STAGE_CRITERIA_LABELS[stage];
-  const criteriaStr = criteria.map((c, i) => `${c} (${labels[i]})`).join(", ");
-
-  return `Ты тренер по продажам. Оцени работу МЕНЕДЖЕРА в диалоге по этапу "${STAGES.find(s => s.id === stage)?.label}".
-
-Оцени по 5 критериям от 1 до 10: ${criteriaStr}.
-
-Ответь ТОЛЬКО валидным JSON без markdown:
-{"scores":{"${criteria[0]}":7,"${criteria[1]}":6,"${criteria[2]}":5,"${criteria[3]}":6,"${criteria[4]}":4},"totalScore":6,"verdict":"Хорошо","bestMoment":"текст","worstMoment":"текст","tip":"текст"}`;
+  const ex = {};
+  criteria.forEach((c, i) => ex[c] = 5);
+  return `Ты тренер по продажам. Оцени МЕНЕДЖЕРА в диалоге по этапу "${STAGES.find(s => s.id === stage)?.label}". Оцени каждый критерий от 1 до 10: ${criteria.map((c,i) => c+'('+labels[i]+')').join(', ')}. Ответь ТОЛЬКО JSON: ${JSON.stringify({scores: ex, totalScore: 5, verdict: "Хорошо", bestMoment: "текст", worstMoment: "текст", tip: "текст"})}`;
 }
 
 async function askClaude(system, history) {
@@ -88,14 +72,14 @@ function Bar({ label, value }) {
         <span style={{ fontSize: 13, fontWeight: 700, color }}>{value}/10</span>
       </div>
       <div style={{ height: 6, background: '#1e293b', borderRadius: 3 }}>
-        <div style={{ height: 6, borderRadius: 3, background: color, width: `${value * 10}%`, transition: 'width 1s ease' }} />
+        <div style={{ height: 6, borderRadius: 3, background: color, width: `${value * 10}%` }} />
       </div>
     </div>
   );
 }
 
 export default function Home() {
-  const [step, setStep] = useState('niche'); // niche | stage | chat | result
+  const [step, setStep] = useState('niche');
   const [niche, setNiche] = useState('');
   const [stage, setStage] = useState('');
   const [history, setHistory] = useState([]);
@@ -107,17 +91,14 @@ export default function Home() {
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [history, loading]);
 
-  function startChat() {
-    const stageData = STAGES.find(s => s.id === stage);
-    const nicheData = NICHES.find(n => n.id === niche);
+  function startChat(selectedStage) {
     const firstMsg = {
-      contact: `Здравствуйте`,
-      needs: `Привет, хочу кое-что купить`,
-      presentation: `Расскажите мне про ваш продукт`,
-      objections: `Интересно, но дорого как-то...`,
-      closing: `Ну в принципе всё понятно, надо подумать`,
-    }[stage];
-
+      contact: 'Здравствуйте',
+      needs: 'Привет, хочу кое-что купить',
+      presentation: 'Расскажите про ваш продукт',
+      objections: 'Интересно, но дорого как-то...',
+      closing: 'Ну в принципе понятно, надо подумать',
+    }[selectedStage];
     setHistory([{ from: 'client', text: firstMsg }]);
     setStep('chat');
     setTimeout(() => inputRef.current?.focus(), 100);
@@ -131,13 +112,21 @@ export default function Home() {
     setHistory(newHistory);
     setLoading(true);
 
-    const claudeMessages = newHistory.map(m => ({
+    // Строим сообщения правильно для Anthropic API
+    // Клиент = assistant, менеджер = user
+    // Первое сообщение должно быть user (менеджер)
+    const allMsgs = newHistory.map(m => ({
       role: m.from === 'manager' ? 'user' : 'assistant',
       content: m.text
     }));
 
+    // Убираем ведущие assistant сообщения
+    while (allMsgs.length > 0 && allMsgs[0].role === 'assistant') {
+      allMsgs.shift();
+    }
+
     try {
-      const reply = await askClaude(buildSystemPrompt(niche, stage), claudeMessages);
+      const reply = await askClaude(buildSystemPrompt(niche, stage), allMsgs);
       const updated = [...newHistory, { from: 'client', text: reply }];
       setHistory(updated);
       const count = updated.filter(m => m.from === 'manager').length;
@@ -160,7 +149,7 @@ export default function Home() {
     } catch {
       const defaultScores = {};
       criteria.forEach(c => defaultScores[c] = 5);
-      setResult({ scores: defaultScores, totalScore: 5, verdict: 'Хорошо', bestMoment: 'Старались вести диалог.', worstMoment: 'Нет данных.', tip: 'Практикуйтесь больше!' });
+      setResult({ scores: defaultScores, totalScore: 5, verdict: 'Хорошо', bestMoment: 'Старались.', worstMoment: 'Нет данных.', tip: 'Практикуйтесь!' });
     }
     setStep('result');
   }
@@ -173,12 +162,10 @@ export default function Home() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#0a0f1e', color: '#e2e8f0', fontFamily: 'Inter,system-ui,sans-serif', display: 'flex', flexDirection: 'column' }}>
-
-      {/* Header */}
       <div style={{ background: '#0f172a', borderBottom: '1px solid #1e293b', padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 12 }}>
         <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg,#3b82f6,#8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>⚡</div>
         <div>
-          <div style={{ fontWeight: 800, fontSize: 16, letterSpacing: '-0.5px' }}>SalesAI</div>
+          <div style={{ fontWeight: 800, fontSize: 16 }}>SalesAI</div>
           <div style={{ fontSize: 11, color: '#475569' }}>Тренажёр продаж</div>
         </div>
         {(step === 'chat' || step === 'evaluating') && (
@@ -190,22 +177,19 @@ export default function Home() {
         )}
       </div>
 
-      {/* STEP 1: Choose Niche */}
       {step === 'niche' && (
         <div style={{ flex: 1, padding: '32px 20px', maxWidth: 600, margin: '0 auto', width: '100%' }}>
           <div style={{ marginBottom: 32 }}>
             <div style={{ fontSize: 11, color: '#3b82f6', letterSpacing: 3, textTransform: 'uppercase', marginBottom: 8 }}>Шаг 1 из 2</div>
-            <h1 style={{ fontSize: 26, fontWeight: 800, margin: 0, letterSpacing: '-0.5px' }}>Выберите нишу</h1>
+            <h1 style={{ fontSize: 26, fontWeight: 800, margin: 0 }}>Выберите нишу</h1>
             <p style={{ color: '#64748b', fontSize: 14, marginTop: 8 }}>AI подстроит покупателя под ваш бизнес</p>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             {NICHES.map(n => (
               <button key={n.id} onClick={() => { setNiche(n.id); setStep('stage'); }}
-                style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: 12, padding: '16px', textAlign: 'left', cursor: 'pointer', transition: 'all 0.15s' }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = '#3b82f6'; e.currentTarget.style.background = '#0f1f3d'; }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = '#1e293b'; e.currentTarget.style.background = '#0f172a'; }}>
+                style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: 12, padding: 16, textAlign: 'left', cursor: 'pointer' }}>
                 <div style={{ fontSize: 28, marginBottom: 8 }}>{n.emoji}</div>
-                <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>{n.label}</div>
+                <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4, color: '#e2e8f0' }}>{n.label}</div>
                 <div style={{ fontSize: 11, color: '#475569' }}>{n.examples}</div>
               </button>
             ))}
@@ -213,24 +197,21 @@ export default function Home() {
         </div>
       )}
 
-      {/* STEP 2: Choose Stage */}
       {step === 'stage' && (
         <div style={{ flex: 1, padding: '32px 20px', maxWidth: 600, margin: '0 auto', width: '100%' }}>
           <div style={{ marginBottom: 32 }}>
             <button onClick={() => setStep('niche')} style={{ background: 'none', border: 'none', color: '#475569', fontSize: 13, cursor: 'pointer', marginBottom: 16, padding: 0 }}>← Назад</button>
             <div style={{ fontSize: 11, color: '#3b82f6', letterSpacing: 3, textTransform: 'uppercase', marginBottom: 8 }}>Шаг 2 из 2</div>
-            <h1 style={{ fontSize: 26, fontWeight: 800, margin: 0, letterSpacing: '-0.5px' }}>Этап продаж</h1>
+            <h1 style={{ fontSize: 26, fontWeight: 800, margin: 0 }}>Этап продаж</h1>
             <p style={{ color: '#64748b', fontSize: 14, marginTop: 8 }}>Ниша: {nicheData?.emoji} {nicheData?.label}</p>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {STAGES.map((s, i) => (
-              <button key={s.id} onClick={() => { setStage(s.id); startChat(); }}
-                style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: 12, padding: '16px 20px', textAlign: 'left', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 16, transition: 'all 0.15s' }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = '#3b82f6'; e.currentTarget.style.background = '#0f1f3d'; }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = '#1e293b'; e.currentTarget.style.background = '#0f172a'; }}>
+              <button key={s.id} onClick={() => { setStage(s.id); startChat(s.id); }}
+                style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: 12, padding: '16px 20px', textAlign: 'left', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 16 }}>
                 <div style={{ width: 40, height: 40, borderRadius: 10, background: '#1e293b', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>{s.emoji}</div>
                 <div>
-                  <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 3 }}>{i + 1}. {s.label}</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 3, color: '#e2e8f0' }}>{i + 1}. {s.label}</div>
                   <div style={{ fontSize: 12, color: '#475569' }}>{s.desc}</div>
                 </div>
               </button>
@@ -239,14 +220,11 @@ export default function Home() {
         </div>
       )}
 
-      {/* CHAT */}
       {(step === 'chat' || step === 'evaluating') && (
         <>
-          <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ flex: 1, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div style={{ textAlign: 'center', marginBottom: 4 }}>
-              <span style={{ fontSize: 11, color: '#334155', background: '#0f172a', padding: '3px 12px', borderRadius: 20 }}>
-                Покупатель — {nicheData?.label}
-              </span>
+              <span style={{ fontSize: 11, color: '#334155', background: '#0f172a', padding: '3px 12px', borderRadius: 20 }}>Покупатель — {nicheData?.label}</span>
             </div>
             {history.map((m, i) => (
               <div key={i} style={{ display: 'flex', justifyContent: m.from === 'client' ? 'flex-start' : 'flex-end', gap: 8 }}>
@@ -255,7 +233,7 @@ export default function Home() {
               </div>
             ))}
             {loading && (
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <div style={{ display: 'flex', gap: 8 }}>
                 <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#1e293b', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>👤</div>
                 <div style={{ background: '#0f172a', border: '1px solid #1e293b', padding: '10px 16px', borderRadius: '4px 16px 16px 16px', color: '#334155', letterSpacing: 4, fontSize: 18 }}>•••</div>
               </div>
@@ -272,7 +250,6 @@ export default function Home() {
         </>
       )}
 
-      {/* RESULT */}
       {step === 'result' && result && (
         <div style={{ flex: 1, overflowY: 'auto', padding: '20px 16px' }}>
           <div style={{ maxWidth: 500, margin: '0 auto' }}>
@@ -282,36 +259,23 @@ export default function Home() {
               <div style={{ fontSize: 11, color: '#475569', marginBottom: 10 }}>из 10</div>
               <div style={{ display: 'inline-block', background: (vc[result.verdict] || '#3b82f6') + '22', color: vc[result.verdict] || '#3b82f6', padding: '6px 20px', borderRadius: 20, fontSize: 14, fontWeight: 700 }}>{result.verdict}</div>
             </div>
-
             <div style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: 12, padding: 20, marginBottom: 14 }}>
               <div style={{ fontSize: 11, color: '#3b82f6', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 16 }}>Детальная оценка</div>
               {STAGE_CRITERIA[stage].map((c, i) => (
                 <Bar key={c} label={STAGE_CRITERIA_LABELS[stage][i]} value={result.scores[c] || 5} />
               ))}
             </div>
-
             <div style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: 12, padding: 20, marginBottom: 16 }}>
-              {[
-                { label: '✓ Лучший момент', text: result.bestMoment, color: '#10b981' },
-                { label: '✗ Главная ошибка', text: result.worstMoment, color: '#ef4444' },
-                { label: '→ Совет', text: result.tip, color: '#f59e0b' },
-              ].map(({ label, text, color }) => (
+              {[{ label: '✓ Лучший момент', text: result.bestMoment, color: '#10b981' }, { label: '✗ Главная ошибка', text: result.worstMoment, color: '#ef4444' }, { label: '→ Совет', text: result.tip, color: '#f59e0b' }].map(({ label, text, color }) => (
                 <div key={label} style={{ marginBottom: 14 }}>
                   <div style={{ fontSize: 11, color, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 6 }}>{label}</div>
                   <div style={{ fontSize: 14, color: '#94a3b8', lineHeight: 1.6 }}>{text}</div>
                 </div>
               ))}
             </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
-              <button onClick={() => { setHistory([]); setResult(null); setInput(''); setStep('chat'); startChat(); }}
-                style={{ background: '#1e293b', color: '#e2e8f0', border: 'none', borderRadius: 10, padding: 14, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
-                🔄 Повторить этап
-              </button>
-              <button onClick={reset}
-                style={{ background: '#1d4ed8', color: '#fff', border: 'none', borderRadius: 10, padding: 14, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
-                ⚡ Новый сценарий
-              </button>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <button onClick={() => { setHistory([]); setResult(null); setInput(''); startChat(stage); }} style={{ background: '#1e293b', color: '#e2e8f0', border: 'none', borderRadius: 10, padding: 14, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>🔄 Повторить</button>
+              <button onClick={reset} style={{ background: '#1d4ed8', color: '#fff', border: 'none', borderRadius: 10, padding: 14, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>⚡ Новый сценарий</button>
             </div>
           </div>
         </div>
