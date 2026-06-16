@@ -7,8 +7,13 @@ export default async function handler(req, res) {
   try {
     const { messages, system } = req.body;
     
-    // Фильтруем пустые сообщения
-    const cleanMessages = messages.filter(m => m.content && m.content.trim() !== '');
+    // Anthropic требует чередование user/assistant и начало с user
+    // Если первое сообщение от assistant — добавляем пустой user
+    let cleanMessages = messages.filter(m => m.content && m.content.trim() !== '');
+    
+    if (cleanMessages.length > 0 && cleanMessages[0].role === 'assistant') {
+      cleanMessages = [{ role: 'user', content: '...' }, ...cleanMessages];
+    }
     
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -26,14 +31,10 @@ export default async function handler(req, res) {
     });
     const data = await response.json();
     if (data.error) {
-      return res.status(200).json({ 
-        content: [{ text: 'Ошибка API: ' + data.error.message }] 
-      });
+      return res.status(200).json({ content: [{ text: 'Ошибка API: ' + data.error.message }] });
     }
     res.status(200).json(data);
   } catch (error) {
-    res.status(200).json({ 
-      content: [{ text: 'Ошибка: ' + error.message }] 
-    });
+    res.status(200).json({ content: [{ text: 'Ошибка: ' + error.message }] });
   }
 }
