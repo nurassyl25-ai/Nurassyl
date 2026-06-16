@@ -11,7 +11,10 @@ async function askClaude(system, history) {
     body: JSON.stringify({ system, messages: history })
   });
   const data = await res.json();
-  return data.content?.[0]?.text?.trim() || '';
+console.log('API response:', JSON.stringify(data));
+if (data.error) throw new Error(data.error.message);
+return data.content?.[0]?.text?.trim() || '';
+
 }
 
 function Bar({ label, value }) {
