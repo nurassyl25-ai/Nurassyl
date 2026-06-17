@@ -238,7 +238,7 @@ export default function Home() {
         <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg,#3b82f6,#8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>⚡</div>
         <div>
           <div style={{ fontWeight: 800, fontSize: 16 }}>SalesAI</div>
-          <div style={{ fontSize: 11, color: '#475569' }}>{isKz ? 'Сату жаттықтырушысы' : 'Тренажёр продаж'}</div>
+          <div style={{ fontSize: 11, color: '#475569' }}>{isKz ? 'Нұрасыл · Сату жаттықтырушысы' : 'Нурасыл · Тренер по продажам'}</div>
         </div>
         {step !== 'login' && step !== 'lang' && (
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -274,7 +274,8 @@ export default function Home() {
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
           <div style={{ textAlign: 'center' }}>
             <div style={{ fontSize: 52, marginBottom: 16 }}>⚡</div>
-            <h1 style={{ fontSize: 24, fontWeight: 800, marginBottom: 32 }}>SalesAI</h1>
+            <h1 style={{ fontSize: 24, fontWeight: 800, marginBottom: 8 }}>SalesAI</h1>
+            <p style={{ color: '#64748b', fontSize: 14, marginBottom: 32 }}>{isKz ? 'Нұрасылмен сату өнерін үйреніңіз' : 'Учитесь продавать вместе с Нурасылом'}</p>
             <div style={{ display: 'flex', gap: 16, justifyContent: 'center' }}>
               <button onClick={() => { setLang('ru'); setStep('home'); }} style={{ background: '#0f172a', border: '2px solid #3b82f6', borderRadius: 14, padding: '20px 32px', cursor: 'pointer', color: '#e2e8f0' }}>
                 <div style={{ fontSize: 32, marginBottom: 8 }}>🇷🇺</div>
@@ -300,13 +301,13 @@ export default function Home() {
               <button onClick={() => setStep('problem')} style={{ ...card, border: '1px solid #3b82f6' }}>
                 <div style={{ fontSize: 28, marginBottom: 10 }}>💬</div>
                 <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 6, color: '#e2e8f0' }}>{isKz ? 'Проблемамды сипаттау' : 'Описать свою проблему'}</div>
-                <div style={{ fontSize: 13, color: '#64748b', lineHeight: 1.5 }}>{isKz ? 'AI проблемаңызды талдайды, себебін түсіндіреді, дайын жауаптар береді. Содан кейін жаттығу.' : 'AI разберёт проблему, объяснит причину, даст готовые фразы. Потом практика.'}</div>
+                <div style={{ fontSize: 13, color: '#64748b', lineHeight: 1.5 }}>{isKz ? 'Нұрасыл проблемаңызды талдайды, себебін түсіндіреді, дайын жауаптар береді. Содан кейін жаттығу.' : 'Нурасыл разберёт проблему, объяснит причину и даст готовые фразы. Потом практика.'}</div>
                 <div style={{ marginTop: 10, fontSize: 11, color: '#3b82f6', background: '#1e3a5f', padding: '4px 10px', borderRadius: 20, display: 'inline-block' }}>{isKz ? '✨ Ұсынылады' : '✨ Рекомендуем'}</div>
               </button>
               <button onClick={() => setStep('stages_list')} style={card}>
                 <div style={{ fontSize: 28, marginBottom: 10 }}>📚</div>
                 <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 6, color: '#e2e8f0' }}>{isKz ? 'Сату кезеңдерін оқу' : 'Изучить этапы продаж'}</div>
-                <div style={{ fontSize: 13, color: '#64748b', lineHeight: 1.5 }}>{isKz ? 'Теория + дайын фразалар + практика. Әр кезең бойынша толық оқу.' : 'Теория + готовые фразы + практика. Полное обучение по каждому этапу.'}</div>
+                <div style={{ fontSize: 13, color: '#64748b', lineHeight: 1.5 }}>{isKz ? 'Нұрасылдың теориясы + дайын фразалар + жаттығу. Әр кезең бойынша толық оқу.' : 'Теория Нурасыла + готовые фразы + практика. Полное обучение по каждому этапу.'}</div>
               </button>
             </div>
           </div>
@@ -319,7 +320,7 @@ export default function Home() {
           <div style={{ maxWidth: 480, margin: '0 auto' }}>
             <button onClick={() => setStep('home')} style={{ background: 'none', border: 'none', color: '#475569', fontSize: 13, cursor: 'pointer', marginBottom: 20, padding: 0 }}>← {isKz ? 'Артқа' : 'Назад'}</button>
             <h1 style={{ fontSize: 22, fontWeight: 800, marginBottom: 8 }}>{isKz ? 'Проблемаңызды жазыңыз' : 'Опишите вашу проблему'}</h1>
-            <p style={{ color: '#64748b', fontSize: 14, marginBottom: 16 }}>{isKz ? 'AI проблемаңызды талдап, нақты кеңестер мен дайын жауаптар береді' : 'AI разберёт ситуацию и даст конкретные фразы'}</p>
+            <p style={{ color: '#64748b', fontSize: 14, marginBottom: 16 }}>{isKz ? 'Нұрасыл проблемаңызды талдап, нақты кеңестер мен дайын жауаптар береді' : 'Нурасыл разберёт ситуацию и даст конкретные фразы'}</p>
             <div style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: 10, padding: 8, marginBottom: 12 }}>
               {(isKz ? ['Клиент қымбат деп кетіп қалады', 'Клиентпен қалай сөйлесуді білмеймін', 'Клиент тыңдайды бірақ сатып алмайды', 'Клиентке не керектігін анықтай алмаймын'] :
                 ['Клиенты говорят «дорого» и уходят', 'Не знаю как начать разговор с клиентом', 'Клиент слушает но не покупает', 'Не могу выяснить что нужно клиенту']).map(ex => (
@@ -372,7 +373,7 @@ export default function Home() {
             </div>
             <div style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: 12, padding: 18, textAlign: 'center' }}>
               <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 6 }}>🎯 {isKz ? 'Енді жаттығу уақыты!' : 'Теперь время практики!'}</div>
-              <div style={{ fontSize: 13, color: '#64748b', marginBottom: 14 }}>{isKz ? 'AI сатып алушы рөлін ойнайды.' : 'AI сыграет покупателя. Примените что узнали.'}</div>
+              <div style={{ fontSize: 13, color: '#64748b', marginBottom: 14 }}>{isKz ? 'Нұрасылдың кеңестерін қолданып жаттығыңыз.' : 'Применяйте советы Нурасыла на практике.'}</div>
               <div style={{ display: 'flex', gap: 10 }}>
                 <button onClick={() => { setStageId(coaching.stage); setStep('business_quick'); }} style={{ flex: 1, background: '#1d4ed8', color: '#fff', border: 'none', borderRadius: 10, padding: 14, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
                   ⚡ {isKz ? 'Жаттығуды бастау' : 'Начать практику'}
@@ -481,7 +482,7 @@ export default function Home() {
 
             <div style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: 12, padding: 18, textAlign: 'center', marginTop: 16 }}>
               <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 6 }}>🎯 {isKz ? 'Жаттығуға дайынсыз ба?' : 'Готовы практиковаться?'}</div>
-              <div style={{ fontSize: 13, color: '#64748b', marginBottom: 14 }}>{isKz ? 'AI сатып алушы рөлін ойнайды.' : 'AI сыграет покупателя — применяйте то что изучили.'}</div>
+              <div style={{ fontSize: 13, color: '#64748b', marginBottom: 14 }}>{isKz ? 'Нұрасылдың материалдарын қолданып жаттығыңыз.' : 'Применяйте материалы Нурасыла на практике.'}</div>
               <button onClick={() => { setStageId(selectedStage.id); setStep('business_quick'); }}
                 style={{ width: '100%', background: '#1d4ed8', color: '#fff', border: 'none', borderRadius: 10, padding: 14, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
                 ⚡ {isKz ? 'Жаттығуды бастау' : 'Начать практику'}
