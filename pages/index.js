@@ -1,7 +1,19 @@
 import { useState, useRef, useEffect } from "react";
 import { STAGES_THEORY } from '../lib/theory';
 
-const ACCESS_CODES = ["JUNE2025", "DEMO123"];
+// Коды автоматически меняются каждый месяц
+// Формат: NURASSYL + месяц + год (например июль 2025 = NURASSYL0725)
+function getMonthlyCode() {
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const year = String(now.getFullYear()).slice(-2);
+  return `NURASSYL${month}${year}`;
+}
+
+const ACCESS_CODES = [
+  getMonthlyCode(), // Автоматический код текущего месяца
+  "DEMO123",        // Для демо показов
+];
 
 const BUSINESS_TYPES = {
   ru: [
