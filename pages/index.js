@@ -1,18 +1,20 @@
 import { useState, useRef, useEffect } from "react";
 import { STAGES_THEORY } from '../lib/theory';
 
-// Коды автоматически меняются каждый месяц
-// Формат: NURASSYL + месяц + год (например июль 2025 = NURASSYL0725)
-function getMonthlyCode() {
-  const now = new Date();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const year = String(now.getFullYear()).slice(-2);
-  return `NURASSYL${month}${year}`;
-}
-
 const ACCESS_CODES = [
-  getMonthlyCode(), // Автоматический код текущего месяца
-  "DEMO123",        // Для демо показов
+  "NURASSYL0625", // Июнь 2025
+  "NURASSYL0725", // Июль 2025
+  "NURASSYL0825", // Август 2025
+  "NURASSYL0925", // Сентябрь 2025
+  "NURASSYL1025", // Октябрь 2025
+  "NURASSYL1125", // Ноябрь 2025
+  "NURASSYL1225", // Декабрь 2025
+  "NURASSYL0126", // Январь 2026
+  "NURASSYL0226", // Февраль 2026
+  "NURASSYL0326", // Март 2026
+  "NURASSYL0426", // Апрель 2026
+  "NURASSYL0526", // Май 2026
+  "DEMO123",      // Демо показ
 ];
 
 const BUSINESS_TYPES = {
