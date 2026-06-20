@@ -12,7 +12,6 @@ export default async function handler(req, res) {
       cleanMessages.shift();
     }
 
-    // Всё через OpenAI — лучше работает с казахским и русским
     const openaiMessages = [
       { role: 'system', content: system },
       ...cleanMessages
@@ -25,7 +24,7 @@ export default async function handler(req, res) {
         'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'gpt-4o',
         max_tokens: 1000,
         messages: openaiMessages
       })
