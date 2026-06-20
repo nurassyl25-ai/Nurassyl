@@ -86,8 +86,8 @@ function buildBuyerPrompt(business, stageId, lang) {
 - Тренер емессің — кеңес берме, менеджерге көмектеспе
 - Тек қазақша
 - Кредит ұсынса: "Жоқ, кредит керек емес маған"
-- МАҢЫЗДЫ: Егер менеджер "Ок", "Иә", "Ештене", "Жарайды" сияқты қысқа мағынасыз жауап берсе — табиғи түрде кетіп қал: "Түсінікті, онда мен басқа жерге қараймын" немесе "Жарайды, ойланып көрейін"
-- 8 хабарламадан кейін шешім: "Жарайды, рәсімдейік" немесе "Жоқ, басқа жерге барамын"`;
+- МАҢЫЗДЫ: Егер менеджер "Ок", "Иә", "Ештене", "Жарайды" сияқты қысқа мағынасыз жауап берсе — табиғи түрде кетіп қал: "Түсінікті, онда мен басқа жерді көрейін" немесе "Жарайды, ойланып көрейін"
+- 8 хабарламадан кейін шешім: "Жарайды, рәсімдейік" немесе "Жоқ, басқа жерді көрейін"`;
   }
 
   const s = {
@@ -127,9 +127,16 @@ JSON: ${JSON.stringify({scores:ex,totalScore:5,verdict:"Хорошо",bestMoment
 
 function buildSummaryPrompt(lang, problem, score, stageLabel) {
   const isKz = lang === 'kz';
-  return `Тренер Нурасыл. Тема: "${stageLabel}". Проблема: "${problem}". Результат: ${score}/10.
-${isKz ? 'Қазақша жаз.' : 'На русском.'}
-JSON: ${JSON.stringify({achievement:"что освоил",stillNeed:"что доработать",homework:"конкретное задание для самостоятельной практики",nextStage:"следующий этап для изучения и почему"})}`;
+  const ex = {
+    achievement: isKz ? "не үйрендім" : "что освоил",
+    stillNeed: isKz ? "не жетіспейді" : "что доработать",
+    homework: isKz ? "үй тапсырмасы" : "домашнее задание",
+    nextStage: isKz ? "келесі кезең" : "следующий этап"
+  };
+  return `Ты тренер Нурасыл. Тема: "${stageLabel}". Проблема: "${problem}". Результат практики: ${score}/10.
+${isKz ? 'Барлығын қазақша жаз. Ресми емес, тірі тілде.' : 'Всё на русском языке.'}
+Дай итоговое резюме обучения. ТОЛЬКО JSON без markdown и пояснений:
+{"achievement":"${ex.achievement}","stillNeed":"${ex.stillNeed}","homework":"${ex.homework}","nextStage":"${ex.nextStage}"}`;
 }
 
 async function callAPI(system, messages, lang) {
@@ -326,13 +333,23 @@ export default function Home() {
     try {
       const raw = await callAPI(
         buildSummaryPrompt(lang, problem, practiceResult?.totalScore || 5, stageLabel),
-        [{ role: 'user', content: 'Дай резюме' }], lang
+        [{ role: 'user', content: 'Дай резюме обучения' }], lang
       );
-      const clean = raw.replace(/```json|```/g, '').trim();
-      setSummary(JSON.parse(clean));
-    } catch {
+      const clean = raw.replace(/```json|```/g, '').replace(/^[^{]*/, '').replace(/[^}]*$/, '').trim();
+      const parsed = JSON.parse(clean);
       setSummary({
-        achievement: '—', stillNeed: '—', homework: '—', nextStage: '—'
+        achievement: parsed.achievement || '—',
+        stillNeed: parsed.stillNeed || '—',
+        homework: parsed.homework || '—',
+        nextStage: parsed.nextStage || '—',
+      });
+    } catch(e) {
+      console.error('Summary error:', e);
+      setSummary({
+        achievement: lang === 'kz' ? 'Жаттығуды аяқтадыңыз' : 'Завершили практику',
+        stillNeed: lang === 'kz' ? 'Жаттығуды жалғастырыңыз' : 'Продолжайте практиковаться',
+        homework: lang === 'kz' ? 'Күнде 10 минут жаттығыңыз' : 'Практикуйтесь каждый день по 10 минут',
+        nextStage: lang === 'kz' ? 'Басқа кезеңді зерттеңіз' : 'Изучите следующий этап продаж',
       });
     }
     setStep('summary');
