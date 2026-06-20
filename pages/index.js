@@ -247,6 +247,9 @@ export default function Home() {
       setHistory(withClient);
       setLoading(false);
 
+      // Only show inline coaching during attempt 2 (after theory)
+      if (attempt !== 2) return;
+
       // Now check manager's last message for errors (inline coaching)
       setCheckingCoach(true);
       try {
