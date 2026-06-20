@@ -2,18 +2,9 @@ import { useState, useRef, useEffect } from "react";
 import { STAGES_THEORY } from '../lib/theory';
 
 const ACCESS_CODES = [
-  "NURASSYL0625", // Июнь 2025
-  "NURASSYL0725", // Июль 2025
-  "NURASSYL0825", // Август 2025
-  "NURASSYL0925", // Сентябрь 2025
-  "NURASSYL1025", // Октябрь 2025
-  "NURASSYL1125", // Ноябрь 2025
-  "NURASSYL1225", // Декабрь 2025
-  "NURASSYL0126", // Январь 2026
-  "NURASSYL0226", // Февраль 2026
-  "NURASSYL0326", // Март 2026
-  "NURASSYL0426", // Апрель 2026
-  "NURASSYL0526", // Май 2026
+  "NURASSYL0625", "NURASSYL0725", "NURASSYL0825", "NURASSYL0925",
+  "NURASSYL1025", "NURASSYL1125", "NURASSYL1225", "NURASSYL0126",
+  "NURASSYL0226", "NURASSYL0326", "NURASSYL0426", "NURASSYL0526",
   "DEMO123",
 ];
 
@@ -25,114 +16,107 @@ const CRITERIA = {
   closing: { keys: ["signal","offer","urgency","confirmation","nextStep"], ru: ["Сигнал","Предложение","Срочность","Подтверждение","Следующий шаг"], kz: ["Сигнал","Ұсыныс","Шұғылдық","Растау","Келесі қадам"] },
 };
 
-const COACHING_PROMPT = {
-  ru: `Ты опытный тренер по продажам Нурасыл. Менеджер описал свою проблему.
-
-Определи ТОЧНО какой этап продаж нужно тренировать:
-- contact — проблемы с первым впечатлением, приветствием
-- needs — не знает что нужно клиенту, клиент не раскрывается
-- presentation — клиент слушает но не заинтересован
-- objections — клиент говорит дорого, подумаю, сравнивает с конкурентами
-- closing — клиент уходит думать, не решается купить
-
-ВАЖНО: Если менеджер спрашивает про кредит или рассрочку — не обучай этому. Скажи что платформа обучает прямым продажам, и предложи научить как убедить клиента купить за наличные.
-
-JSON:
-{"stage":"objections","stageLabel":"Отработка возражений","why":"Почему возникает эта проблема (3-4 предложения)","mistake":"Главная ошибка менеджеров (2-3 предложения)","phrases":["Фраза 1","Фраза 2","Фраза 3","Фраза 4"],"tip":"Главный совет (2-3 предложения)"}
-ТОЛЬКО JSON без markdown.`,
-
-  kz: `Сен тәжірибелі сату жаттықтырушысы Нұрасылсың. Менеджер мәселесін сипаттады.
-
-Сату кезеңін ДӘЛМЕ-ДӘЛ анықта:
-- contact — бірінші әсер, сәлемдесу мәселесі
-- needs — клиентке не керектігін білмейді
-- presentation — клиент тыңдайды бірақ қызықпайды
-- objections — клиент қымбат дейді, ойланамын дейді
-- closing — клиент шешім қабылдамайды
-
-МАҢЫЗДЫ: Кредит немесе бөліп төлеу туралы сұраса — үйретпе. Тікелей сатуды үйрет.
-
-JSON:
-{"stage":"objections","stageLabel":"Қарсылықтарды өңдеу","why":"Проблема неліктен туындайды (3-4 сөйлем)","mistake":"Менеджерлердің басты қатесі (2-3 сөйлем)","phrases":["Жауап 1","Жауап 2","Жауап 3","Жауап 4"],"tip":"Басты кеңес (2-3 сөйлем)"}
-ТЕК JSON, markdown жоқ.`
+const DETECT_PROMPT = {
+  ru: `Ты тренер по продажам Нурасыл. Менеджер описал проблему. Определи этап:
+- contact: проблемы с приветствием, первым впечатлением
+- needs: не может выяснить что нужно клиенту
+- presentation: клиент не заинтересован, не видит ценности
+- objections: клиент говорит дорого, подумаю
+- closing: клиент уходит думать, не решается купить
+Не обучай кредитам и рассрочкам.
+JSON: {"stage":"objections","stageLabel":"Отработка возражений"}`,
+  kz: `Сен сату жаттықтырушысы Нұрасылсың. Менеджер мәселесін сипаттады. Кезеңді анықта:
+- contact: сәлемдесу, бірінші әсер мәселесі
+- needs: клиентке не керектігін анықтай алмайды
+- presentation: клиент қызықпайды
+- objections: клиент қымбат дейді, ойланамын дейді
+- closing: клиент шешім қабылдамайды
+JSON: {"stage":"objections","stageLabel":"Қарсылықтарды өңдеу"}`
 };
 
-function buildBuyerPrompt(business, stageId, lang, isSecondAttempt) {
+const COACHING_PROMPT = {
+  ru: (stage, stageLabel) => `Ты тренер по продажам Нурасыл. Проанализируй последний ответ МЕНЕДЖЕРА в диалоге.
+
+Этап продаж: ${stageLabel}
+
+Если менеджер допустил ошибку — дай короткую подсказку прямо сейчас.
+Если всё хорошо — напиши null.
+
+Не обучай кредитам и рассрочкам от банков.
+
+JSON (или null):
+{"hasError": true, "errorText": "Что именно сделал не так (1 предложение)", "correctPhrase": "Как надо было сказать (конкретная фраза)", "tip": "Короткий совет (1 предложение)"}`,
+  kz: (stage, stageLabel) => `Сен сату жаттықтырушысы Нұрасылсың. Диалогтағы МЕНЕДЖЕРДІҢ соңғы жауабын талда.
+
+Сату кезеңі: ${stageLabel}
+
+Менеджер қате жіберсе — қазір қысқа кеңес бер.
+Жақсы болса — null жаз.
+
+JSON (немесе null):
+{"hasError": true, "errorText": "Нені дұрыс жасамады (1 сөйлем)", "correctPhrase": "Қалай айту керек еді (нақты фраза)", "tip": "Қысқа кеңес (1 сөйлем)"}`
+};
+
+function buildBuyerPrompt(business, stageId, lang) {
   const stageData = STAGES_THEORY[lang]?.find(s => s.id === stageId);
   const firstMsg = stageData?.firstMsg?.[lang] || (lang === 'kz' ? 'Сәлеметсіз бе' : 'Здравствуйте');
-  const attemptNote = isSecondAttempt
-    ? (lang === 'kz' ? '\nБұл менеджердің екінші әрекеті — бірінші рет қателесті, енді жақсырақ болуы мүмкін.' : '\nЭто вторая попытка менеджера — в первый раз ошибся, теперь может лучше.')
-    : '';
 
   if (lang === 'kz') {
     const s = {
-      contact: `Сен — ${business} саласының нақты сатып алушысысың. Жаңа келдің. Менеджер сәлемдесті. Шынайы реакция бер.`,
-      needs: `Сен — ${business} саласының нақты сатып алушысысың. Бір нәрсе алғың келеді бірақ не керектігін толық білмейсің.`,
-      presentation: `Сен — ${business} саласының скептик сатып алушысысың. Нақты пайда көрмесең "Маған бұл не береді?" деп сұра.`,
-      objections: `Сен — ${business} саласының сатып алушысысың. Бірінші сөзің: "${firstMsg}". Шынайы мінез көрсет.`,
-      closing: `Сен — ${business} саласында сатып алуға дерлік дайын сатып алушысысың.`,
+      contact: `Сен — "${business}" саласының нақты сатып алушысысың. Жаңа келдің. Шынайы реакция бер.`,
+      needs: `Сен — "${business}" саласының нақты сатып алушысысың. Бір нәрсе алғың келеді бірақ не керектігін толық білмейсің.`,
+      presentation: `Сен — "${business}" саласының скептик сатып алушысысың. Нақты пайда көрмесең "Маған бұл не береді?" деп сұра.`,
+      objections: `Сен — "${business}" саласының сатып алушысысың. Бірінші сөзің: "${firstMsg}". Шынайы мінез көрсет — нашар дәлелге қарсылық бер.`,
+      closing: `Сен — "${business}" саласында сатып алуға дерлік дайын сатып алушысысың.`,
     }[stageId] || '';
-    return `${s}${attemptNote}
+    return `${s}
 
 ЕРЕЖЕЛЕР:
-- Тек сатып алушы бол — тренер емес, кеңес берме
+- Тек сатып алушы бол — тренер емес, кеңес берме, үйретпе
+- Менеджерге көмектеспе — ол өзі шешсін
 - Қысқа жауап — 1-2 сөйлем
-- Тек қазақша
+- Тек таза қазақша
 - Кредит ұсынса: "Маған кредит керек емес"
 - 8 хабарламадан кейін шешім: "Жарайды, рәсімдеңіз" немесе "Жоқ, басқа жерге барамын"`;
   }
 
   const s = {
-    contact: `Ты — реальный покупатель в сфере "${business}". Только зашёл. Реагируй естественно.`,
-    needs: `Ты — реальный покупатель в сфере "${business}". Хочешь что-то купить но не знаешь точно что.`,
-    presentation: `Ты — скептичный покупатель в сфере "${business}". Если нет конкретной выгоды — спрашивай "и что мне с этого?".`,
-    objections: `Ты — реальный покупатель в сфере "${business}". Твоя первая фраза: "${firstMsg}". Веди себя как настоящий клиент.`,
-    closing: `Ты — покупатель в сфере "${business}" почти готовый купить.`,
+    contact: `Ты — реальный покупатель в "${business}". Только зашёл. Реагируй естественно.`,
+    needs: `Ты — реальный покупатель в "${business}". Хочешь что-то купить но не знаешь точно что.`,
+    presentation: `Ты — скептичный покупатель в "${business}". Нет конкретной выгоды — спрашивай "и что мне с этого?".`,
+    objections: `Ты — реальный покупатель в "${business}". Первая фраза: "${firstMsg}". Веди себя как настоящий клиент — на слабый аргумент возражай снова.`,
+    closing: `Ты — покупатель в "${business}" почти готовый купить.`,
   }[stageId] || '';
 
-  return `${s}${attemptNote}
+  return `${s}
 
 ПРАВИЛА:
-- Только покупатель — не тренер, не учи, не давай советов
-- Короткие ответы — 1-2 предложения как в WhatsApp
+- Только покупатель — не тренер, не учи, не помогай менеджеру
+- Менеджер должен сам справиться
+- Короткие ответы — 1-2 предложения
 - Только русский язык
 - Кредит/рассрочку: "Меня не интересует кредит"
-- После 8 сообщений прими решение: "Хорошо, оформляйте" или "Нет, пойду в другое место"`;
+- После 8 сообщений: "Хорошо, оформляйте" или "Нет, пойду в другое место"`;
 }
 
-function buildEvalPrompt(stageId, lang, problem, business, attemptNum) {
+function buildEvalPrompt(stageId, lang, problem, business) {
   const { keys } = CRITERIA[stageId] || CRITERIA.objections;
   const labels = (CRITERIA[stageId] || CRITERIA.objections)[lang];
   const ex = {};
   keys.forEach(k => ex[k] = 5);
   const isKz = lang === 'kz';
-  const attemptText = attemptNum === 1
-    ? (isKz ? 'Бұл бірінші әрекет — теорияға дейін.' : 'Это первая попытка — до изучения теории.')
-    : (isKz ? 'Бұл екінші әрекет — теориядан кейін.' : 'Это вторая попытка — после изучения теории.');
-
-  return `Ты тренер по продажам Нурасыл. ${attemptText} Бизнес: "${business}". Проблема: "${problem}".
-Оцени МЕНЕДЖЕРА по критериям: ${keys.map((k,i)=>k+'('+labels[i]+')').join(', ')}.
+  return `Ты тренер Нурасыл. Бизнес: "${business}". Проблема: "${problem}".
+Оцени МЕНЕДЖЕРА. Критерии: ${keys.map((k,i)=>k+'('+labels[i]+')').join(', ')}.
 ${isKz ? 'Барлығын қазақша жаз.' : 'Всё на русском.'}
-ТОЛЬКО JSON: ${JSON.stringify({scores:ex,totalScore:5,verdict:"Хорошо",bestMoment:"конкретный момент",worstMoment:"конкретная ошибка",tip:"конкретный совет",detailedFeedback:"подробный разбор 3-5 предложений с конкретными фразами которые стоило использовать"})}`;
+JSON: ${JSON.stringify({scores:ex,totalScore:5,verdict:"Хорошо",bestMoment:"конкретный момент из диалога",worstMoment:"конкретная ошибка с цитатой",tip:"конкретный совет",detailedFeedback:"разбор 3-4 предложения с конкретными фразами"})}`;
 }
 
 function buildSummaryPrompt(lang, problem, score1, score2, stageLabel) {
   const isKz = lang === 'kz';
-  return `Ты тренер по продажам Нурасыл. Менеджер прошёл обучение по теме "${stageLabel}".
-Проблема была: "${problem}".
-Первая попытка (до теории): ${score1}/10
-Вторая попытка (после теории): ${score2}/10
-
+  return `Тренер Нурасыл. Тема: "${stageLabel}". Проблема: "${problem}".
+1-я попытка: ${score1}/10. 2-я попытка: ${score2}/10.
 ${isKz ? 'Қазақша жаз.' : 'На русском.'}
-Напиши итоговое резюме в JSON:
-${JSON.stringify({
-  progress: "Оценка прогресса — вырос ли результат и насколько",
-  achievement: "Что менеджер освоил за эту тренировку",
-  stillNeed: "Что ещё нужно доработать",
-  homework: "Конкретное задание для самостоятельной практики",
-  nextStage: "Какой этап продаж рекомендуется изучить следующим"
-})}
-ТОЛЬКО JSON без markdown.`;
+JSON: ${JSON.stringify({progress:"оценка прогресса",achievement:"что освоил",stillNeed:"что доработать",homework:"конкретное задание",nextStage:"следующий этап для изучения"})}`;
 }
 
 async function callAPI(system, messages, lang) {
@@ -166,32 +150,29 @@ export default function Home() {
   const [codeInput, setCodeInput] = useState('');
   const [codeError, setCodeError] = useState('');
 
-  // Mode 1 - Problem flow (4 stages)
   const [problem, setProblem] = useState('');
   const [business, setBusiness] = useState('');
-  const [coaching, setCoaching] = useState(null);
-  const [loadingCoach, setLoadingCoach] = useState(false);
-  const [attempt, setAttempt] = useState(1); // 1 or 2
+  const [stageId, setStageId] = useState('');
+  const [stageLabel, setStageLabel] = useState('');
+  const [attempt, setAttempt] = useState(1);
   const [result1, setResult1] = useState(null);
   const [result2, setResult2] = useState(null);
   const [summary, setSummary] = useState(null);
 
-  // Mode 2 - Stage learning
   const [selectedStage, setSelectedStage] = useState(null);
   const [theoryTab, setTheoryTab] = useState('theory');
-  const [stageId, setStageId] = useState('');
   const [stageBusiness, setStageBusiness] = useState('');
 
-  // Chat
-  const [history, setHistory] = useState([]);
+  // Chat with inline coaching
+  const [history, setHistory] = useState([]); // {from, text, coaching?}
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState(null);
+  const [checkingCoach, setCheckingCoach] = useState(false);
 
   const bottomRef = useRef();
   const inputRef = useRef();
 
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [history, loading]);
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [history, loading, checkingCoach]);
 
   const isKz = lang === 'kz';
 
@@ -203,89 +184,122 @@ export default function Home() {
     }
   }
 
-  async function handleCoach() {
+  async function startProblemFlow() {
     if (!problem.trim() || !business.trim()) return;
-    setLoadingCoach(true);
+    setStep('detecting');
     try {
-      const raw = await callAPI(COACHING_PROMPT[lang], [{ role: 'user', content: problem }], lang);
+      const raw = await callAPI(DETECT_PROMPT[lang], [{ role: 'user', content: problem }], lang);
       const clean = raw.replace(/```json|```/g, '').trim();
       const parsed = JSON.parse(clean);
-      setCoaching(parsed);
       setStageId(parsed.stage);
-      // Go straight to first practice (proблематизация)
-      startChat(parsed.stage, 1);
+      setStageLabel(parsed.stageLabel);
+      startChat(parsed.stage, parsed.stageLabel, 1);
     } catch {
-      const fallback = { stage: 'objections', stageLabel: isKz ? 'Қарсылықтарды өңдеу' : 'Отработка возражений' };
-      setCoaching(fallback);
-      setStageId(fallback.stage);
-      startChat(fallback.stage, 1);
-    } finally {
-      setLoadingCoach(false);
+      setStageId('objections');
+      setStageLabel(isKz ? 'Қарсылықтарды өңдеу' : 'Отработка возражений');
+      startChat('objections', isKz ? 'Қарсылықтарды өңдеу' : 'Отработка возражений', 1);
     }
   }
 
-  function startChat(sid, attemptNum) {
-    const sId = sid || stageId;
-    const stageInfo = STAGES_THEORY[lang]?.find(s => s.id === sId);
+  function startChat(sid, slabel, attemptNum) {
+    const stageInfo = STAGES_THEORY[lang]?.find(s => s.id === sid);
     const firstMsg = stageInfo?.firstMsg?.[lang] || (isKz ? 'Сәлеметсіз бе' : 'Здравствуйте');
-    setAttempt(attemptNum || 1);
+    setAttempt(attemptNum);
     setHistory([{ from: 'client', text: firstMsg }]);
-    setResult(null);
     setStep('chat');
     setTimeout(() => inputRef.current?.focus(), 100);
   }
 
   async function send() {
-    if (!input.trim() || loading) return;
+    if (!input.trim() || loading || checkingCoach) return;
     const text = input.trim();
     setInput('');
+
+    // Add manager message
     const newHistory = [...history, { from: 'manager', text }];
     setHistory(newHistory);
     setLoading(true);
+
     const allMsgs = newHistory.map(m => ({ role: m.from === 'manager' ? 'user' : 'assistant', content: m.text }));
     while (allMsgs.length > 0 && allMsgs[0].role === 'assistant') allMsgs.shift();
-    const biz = business || stageBusiness;
+
     try {
-      const reply = await callAPI(buildBuyerPrompt(biz, stageId, lang, attempt === 2), allMsgs, lang);
-      const updated = [...newHistory, { from: 'client', text: reply }];
-      setHistory(updated);
-      const count = updated.filter(m => m.from === 'manager').length;
-      const lastMsg = updated[updated.length - 1];
+      // Get buyer response
+      const reply = await callAPI(buildBuyerPrompt(business || stageBusiness, stageId, lang), allMsgs, lang);
+      const withClient = [...newHistory, { from: 'client', text: reply }];
+
+      // Check if dialog is done
+      const managerCount = withClient.filter(m => m.from === 'manager').length;
+      const lastMsg = withClient[withClient.length - 1];
       const isDone = lastMsg.from === 'client' && (
-        count >= 8 ||
+        managerCount >= 8 ||
         lastMsg.text.includes('оформляйте') || lastMsg.text.includes('другое место') ||
         lastMsg.text.includes('рәсімдеңіз') || lastMsg.text.includes('басқа жерге')
       );
-      if (isDone) setTimeout(() => evaluate(updated), 800);
+
+      if (isDone) {
+        setHistory(withClient);
+        setLoading(false);
+        setTimeout(() => evaluate(withClient), 800);
+        return;
+      }
+
+      setHistory(withClient);
+      setLoading(false);
+
+      // Now check manager's last message for errors (inline coaching)
+      setCheckingCoach(true);
+      try {
+        const sl = stageLabel || (isKz ? 'Сату' : 'Продажи');
+        const dialogForCheck = withClient.map(m => `${m.from === 'client' ? 'КЛИЕНТ' : 'МЕНЕДЖЕР'}: ${m.text}`).join('\n');
+        const coachRaw = await callAPI(
+          COACHING_PROMPT[lang](stageId, sl),
+          [{ role: 'user', content: `Диалог:\n${dialogForCheck}\n\nПоследняя фраза менеджера: "${text}"` }],
+          lang
+        );
+        const coachClean = coachRaw.replace(/```json|```/g, '').trim();
+
+        if (coachClean && coachClean !== 'null') {
+          try {
+            const coachData = JSON.parse(coachClean);
+            if (coachData?.hasError) {
+              // Add coaching hint after the last client message
+              setHistory(prev => {
+                const updated = [...prev];
+                updated[updated.length - 1] = {
+                  ...updated[updated.length - 1],
+                  coaching: coachData
+                };
+                return updated;
+              });
+            }
+          } catch {}
+        }
+      } catch {}
+      setCheckingCoach(false);
+
     } catch {
       setHistory(prev => [...prev, { from: 'client', text: '...' }]);
-    } finally {
       setLoading(false);
+      setCheckingCoach(false);
     }
   }
 
   async function evaluate(fin) {
     setStep('evaluating');
-    const dialog = fin.map(m => `${m.from === 'client' ? 'КЛИЕНТ' : 'МЕНЕДЖЕР'}: ${m.text}`).join('\n');
-    const biz = business || stageBusiness;
+    const dialog = fin.filter(m => !m.coaching).map(m => `${m.from === 'client' ? 'КЛИЕНТ' : 'МЕНЕДЖЕР'}: ${m.text}`).join('\n');
     const keys = (CRITERIA[stageId] || CRITERIA.objections).keys;
+    const biz = business || stageBusiness;
     try {
-      const raw = await callAPI(buildEvalPrompt(stageId, lang, problem, biz, attempt), [{ role: 'user', content: dialog }], 'ru');
+      const raw = await callAPI(buildEvalPrompt(stageId, lang, problem, biz), [{ role: 'user', content: dialog }], 'ru');
       const clean = raw.replace(/```json|```/g, '').trim();
       const parsed = JSON.parse(clean);
-      setResult(parsed);
-      if (attempt === 1) {
-        setResult1(parsed);
-        setStep('result1'); // After first attempt → show errors → then theory
-      } else {
-        setResult2(parsed);
-        setStep('result2'); // After second attempt → show comparison → summary
-      }
+      if (attempt === 1) { setResult1(parsed); setStep('result1'); }
+      else { setResult2(parsed); setStep('result2'); }
     } catch {
       const def = {};
       keys.forEach(k => def[k] = 5);
       const fallback = { scores: def, totalScore: 5, verdict: 'Хорошо', bestMoment: '—', worstMoment: '—', tip: '—', detailedFeedback: '—' };
-      setResult(fallback);
       if (attempt === 1) { setResult1(fallback); setStep('result1'); }
       else { setResult2(fallback); setStep('result2'); }
     }
@@ -296,8 +310,8 @@ export default function Home() {
     const stageInfo = STAGES_THEORY[lang]?.find(s => s.id === stageId);
     try {
       const raw = await callAPI(
-        buildSummaryPrompt(lang, problem, result1?.totalScore || 5, result2?.totalScore || 5, stageInfo?.label || ''),
-        [{ role: 'user', content: 'Дай резюме обучения' }], lang
+        buildSummaryPrompt(lang, problem, result1?.totalScore || 5, result2?.totalScore || 5, stageInfo?.label || stageLabel),
+        [{ role: 'user', content: 'Дай резюме' }], lang
       );
       const clean = raw.replace(/```json|```/g, '').trim();
       setSummary(JSON.parse(clean));
@@ -309,19 +323,16 @@ export default function Home() {
   }
 
   function reset() {
-    setHistory([]); setResult(null); setResult1(null); setResult2(null);
-    setSummary(null); setInput(''); setStep('home');
-    setProblem(''); setBusiness(''); setCoaching(null);
-    setSelectedStage(null); setTheoryTab('theory');
-    setStageId(''); setStageBusiness(''); setAttempt(1);
+    setHistory([]); setResult1(null); setResult2(null); setSummary(null);
+    setInput(''); setStep('home'); setProblem(''); setBusiness('');
+    setStageId(''); setStageLabel(''); setSelectedStage(null);
+    setTheoryTab('theory'); setStageBusiness(''); setAttempt(1);
   }
 
   const vc = { 'Отлично': '#10b981', 'Хорошо': '#3b82f6', 'Нужна практика': '#f59e0b', 'Слабо': '#ef4444' };
   const curStage = STAGES_THEORY[lang]?.find(s => s.id === stageId);
-
-  const card = { background: '#0f172a', border: '1px solid #1e293b', borderRadius: 12, padding: 18, cursor: 'pointer', textAlign: 'left' };
-
   const verdictLabel = (v) => ({ 'Отлично': isKz ? 'Өте жақсы' : 'Отлично', 'Хорошо': isKz ? 'Жақсы' : 'Хорошо', 'Нужна практика': isKz ? 'Жаттығу керек' : 'Нужна практика', 'Слабо': isKz ? 'Нашар' : 'Слабо' }[v] || v);
+  const card = { background: '#0f172a', border: '1px solid #1e293b', borderRadius: 12, padding: 18, cursor: 'pointer', textAlign: 'left' };
 
   return (
     <div style={{ minHeight: '100vh', background: '#0a0f1e', color: '#e2e8f0', fontFamily: 'Inter,system-ui,sans-serif', display: 'flex', flexDirection: 'column' }}>
@@ -335,7 +346,7 @@ export default function Home() {
         </div>
         {step !== 'login' && step !== 'lang' && (
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
-            {(step === 'chat' || step === 'evaluating') && (
+            {(step === 'chat') && (
               <button onClick={() => evaluate(history)} style={{ background: 'none', border: '1px solid #1e293b', borderRadius: 6, color: '#64748b', padding: '4px 10px', fontSize: 11, cursor: 'pointer' }}>
                 {isKz ? 'Аяқтау →' : 'Завершить →'}
               </button>
@@ -394,13 +405,19 @@ export default function Home() {
               <button onClick={() => setStep('problem')} style={{ ...card, border: '1px solid #3b82f6' }}>
                 <div style={{ fontSize: 28, marginBottom: 10 }}>💬</div>
                 <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 6, color: '#e2e8f0' }}>{isKz ? 'Проблемамды сипаттау' : 'Описать свою проблему'}</div>
-                <div style={{ fontSize: 13, color: '#64748b', lineHeight: 1.5 }}>{isKz ? 'Нұрасыл проблемаңызды талдайды → жаттығу → теория → қайта жаттығу → резюме' : 'Нурасыл разберёт проблему → практика → теория → практика снова → резюме'}</div>
-                <div style={{ marginTop: 10, fontSize: 11, color: '#3b82f6', background: '#1e3a5f', padding: '4px 10px', borderRadius: 20, display: 'inline-block' }}>{isKz ? '✨ Толық оқу бағдарламасы' : '✨ Полная программа обучения'}</div>
+                <div style={{ fontSize: 13, color: '#64748b', lineHeight: 1.6 }}>
+                  {isKz ? 'Жаттығу → қателерді көру → теория → қайта жаттығу → резюме' : 'Практика → ошибки → теория → практика снова → резюме'}
+                </div>
+                <div style={{ marginTop: 10, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {(isKz ? ['1. Жаттығу', '2. Қателер', '3. Теория', '4. Резюме'] : ['1. Практика', '2. Ошибки', '3. Теория', '4. Резюме']).map(s => (
+                    <span key={s} style={{ fontSize: 11, color: '#3b82f6', background: '#1e3a5f', padding: '2px 8px', borderRadius: 10 }}>{s}</span>
+                  ))}
+                </div>
               </button>
               <button onClick={() => setStep('stages_list')} style={card}>
                 <div style={{ fontSize: 28, marginBottom: 10 }}>📚</div>
                 <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 6, color: '#e2e8f0' }}>{isKz ? 'Сату кезеңдерін оқу' : 'Изучить этапы продаж'}</div>
-                <div style={{ fontSize: 13, color: '#64748b', lineHeight: 1.5 }}>{isKz ? 'Нұрасылдың теориясы + дайын фразалар + жаттығу. Әр кезең бойынша толық оқу.' : 'Теория Нурасыла + готовые фразы + практика. Полное обучение по каждому этапу.'}</div>
+                <div style={{ fontSize: 13, color: '#64748b', lineHeight: 1.5 }}>{isKz ? 'Нұрасылдың теориясы + дайын фразалар + жаттығу' : 'Теория Нурасыла + готовые фразы + практика'}</div>
               </button>
             </div>
           </div>
@@ -413,35 +430,17 @@ export default function Home() {
           <div style={{ maxWidth: 480, margin: '0 auto' }}>
             <button onClick={() => setStep('home')} style={{ background: 'none', border: 'none', color: '#475569', fontSize: 13, cursor: 'pointer', marginBottom: 20, padding: 0 }}>← {isKz ? 'Артқа' : 'Назад'}</button>
             <h1 style={{ fontSize: 22, fontWeight: 800, marginBottom: 8 }}>{isKz ? 'Проблемаңызды сипаттаңыз' : 'Опишите вашу проблему'}</h1>
-            <p style={{ color: '#64748b', fontSize: 14, marginBottom: 20 }}>{isKz ? 'Нұрасыл проблемаңызды талдап, 4 кезеңде оқытады' : 'Нурасыл разберёт проблему и проведёт через 4 стадии обучения'}</p>
+            <p style={{ color: '#64748b', fontSize: 14, marginBottom: 20 }}>{isKz ? 'Нұрасыл жаттығу барысында қателерді бірден көрсетеді' : 'Нурасыл будет показывать ошибки прямо во время практики'}</p>
 
-            {/* Steps preview */}
-            <div style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: 12, padding: 16, marginBottom: 20 }}>
-              {[
-                { n: 1, label: isKz ? 'Өзіңіз байқаңыз' : 'Попробуй сам', desc: isKz ? 'Теориясыз жаттығу' : 'Практика без теории' },
-                { n: 2, label: isKz ? 'Теория' : 'Теория', desc: isKz ? 'Нұрасылдың түсіндірмесі' : 'Объяснение Нурасыла' },
-                { n: 3, label: isKz ? 'Қайта жаттығу' : 'Практика снова', desc: isKz ? 'Білімді қолдану' : 'Применить знания' },
-                { n: 4, label: isKz ? 'Резюме' : 'Резюме', desc: isKz ? 'Прогресс және жоспар' : 'Прогресс и план' },
-              ].map(s => (
-                <div key={s.n} style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 10 }}>
-                  <div style={{ width: 24, height: 24, borderRadius: '50%', background: '#1e293b', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#3b82f6', flexShrink: 0 }}>{s.n}</div>
-                  <div>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: '#e2e8f0' }}>{s.label}</span>
-                    <span style={{ fontSize: 12, color: '#475569', marginLeft: 8 }}>— {s.desc}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div style={{ marginBottom: 14 }}>
-              <label style={{ fontSize: 13, color: '#64748b', display: 'block', marginBottom: 6 }}>{isKz ? 'Сіздің бизнесіңіз:' : 'Ваш бизнес:'}</label>
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ fontSize: 13, color: '#94a3b8', display: 'block', marginBottom: 6 }}>{isKz ? '🏢 Сіздің бизнесіңіз:' : '🏢 Ваш бизнес:'}</label>
               <input value={business} onChange={e => setBusiness(e.target.value)}
                 placeholder={isKz ? 'Мысалы: киім дүкені, жылжымайтын мүлік, IT қызметтер...' : 'Например: магазин одежды, недвижимость, IT услуги...'}
                 style={{ width: '100%', background: '#0f172a', border: '1px solid #1e293b', borderRadius: 10, color: '#e2e8f0', fontSize: 14, padding: '12px 14px', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }} />
             </div>
 
-            <div style={{ marginBottom: 14 }}>
-              <label style={{ fontSize: 13, color: '#64748b', display: 'block', marginBottom: 6 }}>{isKz ? 'Проблемаңыз:' : 'Ваша проблема:'}</label>
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ fontSize: 13, color: '#94a3b8', display: 'block', marginBottom: 6 }}>{isKz ? '💬 Проблемаңыз:' : '💬 Ваша проблема:'}</label>
               <div style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: 10, padding: 8, marginBottom: 8 }}>
                 {(isKz ? ['Клиент қымбат деп кетіп қалады', 'Клиентпен қалай сөйлесуді білмеймін', 'Клиент тыңдайды бірақ сатып алмайды', 'Клиент шешім қабылдамайды'] :
                   ['Клиенты говорят «дорого» и уходят', 'Не знаю как начать разговор', 'Клиент слушает но не покупает', 'Клиент не принимает решение']).map(ex => (
@@ -453,10 +452,20 @@ export default function Home() {
                 style={{ width: '100%', minHeight: 90, background: '#0f172a', border: '1px solid #1e293b', borderRadius: 10, color: '#e2e8f0', fontSize: 14, padding: 14, outline: 'none', fontFamily: 'inherit', resize: 'vertical', boxSizing: 'border-box' }} />
             </div>
 
-            <button onClick={handleCoach} disabled={!problem.trim() || !business.trim() || loadingCoach}
-              style={{ width: '100%', background: (problem.trim() && business.trim() && !loadingCoach) ? '#1d4ed8' : '#1e293b', color: '#fff', border: 'none', borderRadius: 10, padding: 14, fontSize: 15, fontWeight: 700, cursor: (problem.trim() && business.trim()) ? 'pointer' : 'default' }}>
-              {loadingCoach ? (isKz ? '⏳ Талдап жатырмын...' : '⏳ Анализирую...') : (isKz ? '1-кезең: Өзіңіз байқаңыз →' : '1 стадия: Попробуй сам →')}
+            <button onClick={startProblemFlow} disabled={!problem.trim() || !business.trim()}
+              style={{ width: '100%', background: (problem.trim() && business.trim()) ? '#1d4ed8' : '#1e293b', color: '#fff', border: 'none', borderRadius: 10, padding: 14, fontSize: 15, fontWeight: 700, cursor: (problem.trim() && business.trim()) ? 'pointer' : 'default' }}>
+              {isKz ? '▶ Жаттығуды бастау →' : '▶ Начать практику →'}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* DETECTING */}
+      {step === 'detecting' && (
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 42, marginBottom: 16 }}>🔍</div>
+            <div style={{ fontSize: 14, color: '#3b82f6' }}>{isKz ? '⏳ Нұрасыл проблемаңызды талдап жатыр...' : '⏳ Нурасыл анализирует вашу проблему...'}</div>
           </div>
         </div>
       )}
@@ -465,68 +474,95 @@ export default function Home() {
       {(step === 'chat' || step === 'evaluating') && (
         <>
           <div style={{ flex: 1, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {/* Stage indicator */}
-            <div style={{ background: '#1e293b', border: '1px solid #2a3a4a', borderRadius: 10, padding: '10px 16px' }}>
-              {problem && (
-                <div style={{ fontSize: 11, color: '#475569', marginBottom: 4 }}>
-                  {isKz ? '📋 Мәселе' : '📋 Проблема'}: {problem}
-                </div>
-              )}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 12, color: '#3b82f6', fontWeight: 700 }}>
-                  {attempt === 1
-                    ? (isKz ? '🎯 1-кезең: Өзіңіз байқаңыз (теориясыз)' : '🎯 Стадия 1: Попробуй сам (без теории)')
-                    : (isKz ? '🚀 3-кезең: Теориядан кейін жаттығу' : '🚀 Стадия 3: Практика после теории')}
-                </span>
+
+            {/* Header info */}
+            <div style={{ background: '#1e293b', borderRadius: 10, padding: '10px 14px' }}>
+              <div style={{ fontSize: 12, color: '#3b82f6', fontWeight: 700, marginBottom: 2 }}>
+                {attempt === 1 ? (isKz ? '🎯 Жаттығу — өзіңіз байқаңыз' : '🎯 Практика — попробуй сам') : (isKz ? '🚀 Жаттығу — теориядан кейін' : '🚀 Практика — после теории')}
               </div>
-              <div style={{ fontSize: 11, color: '#475569', marginTop: 4 }}>
-                💼 {isKz ? 'Сіз — менеджерсіз. Сатып алушыға жауап беріңіз.' : 'Вы — менеджер. Отвечайте покупателю и доведите до покупки.'}
+              <div style={{ fontSize: 11, color: '#475569' }}>
+                💼 {isKz ? 'Сіз — менеджерсіз. Нұрасыл қателерді бірден көрсетеді.' : 'Вы — менеджер. Нурасыл будет показывать ошибки сразу.'}
               </div>
+              {problem && <div style={{ fontSize: 11, color: '#475569', marginTop: 2 }}>📋 {problem}</div>}
             </div>
 
             {history.map((m, i) => (
-              <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: m.from === 'client' ? 'flex-start' : 'flex-end', gap: 2 }}>
-                <div style={{ fontSize: 10, color: '#475569', marginLeft: m.from === 'client' ? 36 : 0 }}>
-                  {m.from === 'client' ? (isKz ? '👤 Сатып алушы' : '👤 Покупатель') : (isKz ? '💼 Сіз (менеджер)' : '💼 Вы (менеджер)')}
+              <div key={i}>
+                {/* Message */}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: m.from === 'client' ? 'flex-start' : 'flex-end', gap: 2 }}>
+                  <div style={{ fontSize: 10, color: '#475569', marginLeft: m.from === 'client' ? 36 : 0 }}>
+                    {m.from === 'client' ? (isKz ? '👤 Сатып алушы' : '👤 Покупатель') : (isKz ? '💼 Сіз (менеджер)' : '💼 Вы (менеджер)')}
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+                    {m.from === 'client' && <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#1e293b', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0 }}>👤</div>}
+                    <div style={{ maxWidth: '72%', padding: '10px 14px', fontSize: 14, lineHeight: 1.5, borderRadius: m.from === 'client' ? '4px 16px 16px 16px' : '16px 4px 16px 16px', background: m.from === 'client' ? '#0f172a' : '#1d4ed8', color: '#e2e8f0', border: m.from === 'client' ? '1px solid #1e293b' : 'none' }}>{m.text}</div>
+                    {m.from === 'manager' && <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#1d4ed8', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0 }}>💼</div>}
+                  </div>
                 </div>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
-                  {m.from === 'client' && <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#1e293b', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0 }}>👤</div>}
-                  <div style={{ maxWidth: '72%', padding: '10px 14px', fontSize: 14, lineHeight: 1.5, borderRadius: m.from === 'client' ? '4px 16px 16px 16px' : '16px 4px 16px 16px', background: m.from === 'client' ? '#0f172a' : '#1d4ed8', color: '#e2e8f0', border: m.from === 'client' ? '1px solid #1e293b' : 'none' }}>{m.text}</div>
-                  {m.from === 'manager' && <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#1d4ed8', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0 }}>💼</div>}
-                </div>
+
+                {/* Inline coaching hint */}
+                {m.coaching && m.coaching.hasError && (
+                  <div style={{ margin: '8px 0 4px 0', background: '#1a1a2e', border: '1px solid #f59e0b', borderRadius: 10, padding: '10px 14px' }}>
+                    <div style={{ fontSize: 11, color: '#f59e0b', fontWeight: 700, marginBottom: 6 }}>
+                      ⚡ {isKz ? 'Нұрасыл:' : 'Нурасыл:'}
+                    </div>
+                    <div style={{ fontSize: 13, color: '#fbbf24', marginBottom: 6, lineHeight: 1.5 }}>
+                      ⚠️ {m.coaching.errorText}
+                    </div>
+                    <div style={{ background: '#0f172a', borderRadius: 8, padding: '8px 12px', marginBottom: 6 }}>
+                      <div style={{ fontSize: 11, color: '#10b981', marginBottom: 3 }}>{isKz ? '✓ Дұрыс фраза:' : '✓ Правильная фраза:'}</div>
+                      <div style={{ fontSize: 13, color: '#e2e8f0', fontStyle: 'italic' }}>«{m.coaching.correctPhrase}»</div>
+                    </div>
+                    <div style={{ fontSize: 12, color: '#94a3b8' }}>💡 {m.coaching.tip}</div>
+                  </div>
+                )}
               </div>
             ))}
-            {loading && (
-              <div style={{ display: 'flex', gap: 8 }}>
-                <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#1e293b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>👤</div>
-                <div style={{ background: '#0f172a', border: '1px solid #1e293b', padding: '10px 16px', borderRadius: '4px 16px 16px 16px', color: '#334155', letterSpacing: 4, fontSize: 18 }}>•••</div>
+
+            {(loading || checkingCoach) && (
+              <div>
+                {loading && (
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#1e293b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>👤</div>
+                    <div style={{ background: '#0f172a', border: '1px solid #1e293b', padding: '10px 16px', borderRadius: '4px 16px 16px 16px', color: '#334155', letterSpacing: 4, fontSize: 18 }}>•••</div>
+                  </div>
+                )}
+                {checkingCoach && !loading && (
+                  <div style={{ fontSize: 11, color: '#475569', textAlign: 'center', padding: '4px 0' }}>
+                    ⚡ {isKz ? 'Нұрасыл тексеріп жатыр...' : 'Нурасыл проверяет...'}
+                  </div>
+                )}
               </div>
             )}
-            {step === 'evaluating' && <div style={{ textAlign: 'center', color: '#3b82f6', fontSize: 14, padding: 16 }}>⏳ {isKz ? 'Нұрасыл талдап жатыр...' : 'Нурасыл анализирует...'}</div>}
+
+            {step === 'evaluating' && (
+              <div style={{ textAlign: 'center', color: '#3b82f6', fontSize: 14, padding: 16 }}>
+                ⏳ {isKz ? 'Нұрасыл талдап жатыр...' : 'Нурасыл анализирует...'}
+              </div>
+            )}
             <div ref={bottomRef} />
           </div>
+
           {step === 'chat' && (
             <div style={{ background: '#0f172a', borderTop: '1px solid #1e293b', padding: '10px 14px', display: 'flex', gap: 8 }}>
-              <input ref={inputRef} value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') send(); }}
+              <input ref={inputRef} value={input} onChange={e => setInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && !loading && !checkingCoach) send(); }}
                 placeholder={isKz ? 'Сатып алушыға жауабыңыз...' : 'Ваш ответ покупателю...'}
                 style={{ flex: 1, background: '#0a0f1e', border: '1px solid #1e293b', borderRadius: 10, color: '#e2e8f0', fontSize: 14, padding: '10px 14px', outline: 'none', fontFamily: 'inherit' }} />
-              <button onClick={send} disabled={!input.trim() || loading} style={{ background: input.trim() && !loading ? '#1d4ed8' : '#1e293b', color: '#fff', border: 'none', borderRadius: 10, padding: '10px 16px', fontSize: 18, cursor: 'pointer' }}>↑</button>
+              <button onClick={send} disabled={!input.trim() || loading || checkingCoach}
+                style={{ background: (input.trim() && !loading && !checkingCoach) ? '#1d4ed8' : '#1e293b', color: '#fff', border: 'none', borderRadius: 10, padding: '10px 16px', fontSize: 18, cursor: 'pointer' }}>↑</button>
             </div>
           )}
         </>
       )}
 
-      {/* RESULT 1 — After first attempt → show errors → go to theory */}
+      {/* RESULT 1 */}
       {step === 'result1' && result1 && (
         <div style={{ flex: 1, overflowY: 'auto', padding: '20px 16px' }}>
           <div style={{ maxWidth: 500, margin: '0 auto' }}>
-            <div style={{ background: '#1e3a5f', border: '1px solid #3b82f6', borderRadius: 12, padding: 16, marginBottom: 16, textAlign: 'center' }}>
-              <div style={{ fontSize: 13, color: '#93c5fd', marginBottom: 4 }}>
-                {isKz ? '1-кезең аяқталды' : 'Стадия 1 завершена'}
-              </div>
-              <div style={{ fontSize: 11, color: '#475569' }}>
-                {isKz ? 'Енді қателеріңізді көріп, теория оқисыз' : 'Теперь увидите ошибки и изучите теорию'}
-              </div>
+            <div style={{ background: '#1e3a5f', border: '1px solid #3b82f6', borderRadius: 12, padding: 14, marginBottom: 16, textAlign: 'center' }}>
+              <div style={{ fontSize: 13, color: '#93c5fd', fontWeight: 700 }}>{isKz ? '1-кезең аяқталды' : 'Стадия 1 завершена'}</div>
+              <div style={{ fontSize: 11, color: '#475569', marginTop: 4 }}>{isKz ? 'Енді теорияны оқып, қайта жаттығасыз' : 'Теперь изучите теорию и попробуйте снова'}</div>
             </div>
 
             <div style={{ textAlign: 'center', marginBottom: 20 }}>
@@ -536,41 +572,41 @@ export default function Home() {
             </div>
 
             <div style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: 12, padding: 16, marginBottom: 14 }}>
-              <div style={{ fontSize: 11, color: '#ef4444', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 12 }}>✗ {isKz ? 'ТАБЫЛҒАН ҚАТЕЛЕР' : 'НАЙДЕННЫЕ ОШИБКИ'}</div>
-              <div style={{ fontSize: 14, color: '#e2e8f0', lineHeight: 1.7, marginBottom: 10 }}><strong>{isKz ? 'Басты қате:' : 'Главная ошибка:'}</strong> {result1.worstMoment}</div>
-              {result1.detailedFeedback && <div style={{ fontSize: 13, color: '#94a3b8', lineHeight: 1.7 }}>{result1.detailedFeedback}</div>}
+              <div style={{ fontSize: 11, color: '#3b82f6', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 12 }}>{isKz ? 'ТОЛЫҚ БАҒА' : 'ДЕТАЛЬНАЯ ОЦЕНКА'}</div>
+              {(CRITERIA[stageId] || CRITERIA.objections).keys.map((k, i) => (
+                <Bar key={k} label={(CRITERIA[stageId] || CRITERIA.objections)[lang][i]} value={result1.scores[k] || 5} />
+              ))}
             </div>
 
-            <div style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: 12, padding: 16, marginBottom: 16 }}>
+            <div style={{ background: '#0f172a', border: '1px solid #ef444440', borderRadius: 12, padding: 16, marginBottom: 14 }}>
+              <div style={{ fontSize: 11, color: '#ef4444', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 10 }}>✗ {isKz ? 'БАСТЫ ҚАТЕ' : 'ГЛАВНАЯ ОШИБКА'}</div>
+              <div style={{ fontSize: 14, color: '#e2e8f0', lineHeight: 1.7, marginBottom: 10 }}>{result1.worstMoment}</div>
+              {result1.detailedFeedback && <div style={{ fontSize: 13, color: '#94a3b8', lineHeight: 1.7, paddingTop: 10, borderTop: '1px solid #1e293b' }}>{result1.detailedFeedback}</div>}
+            </div>
+
+            <div style={{ background: '#0f172a', border: '1px solid #10b98140', borderRadius: 12, padding: 16, marginBottom: 16 }}>
               <div style={{ fontSize: 11, color: '#10b981', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 8 }}>✓ {isKz ? 'ҮЗДІК СӘТ' : 'ЛУЧШИЙ МОМЕНТ'}</div>
               <div style={{ fontSize: 14, color: '#e2e8f0', lineHeight: 1.7 }}>{result1.bestMoment}</div>
             </div>
 
             <button onClick={() => {
-              if (coaching) {
-                const stageInfo = STAGES_THEORY[lang]?.find(s => s.id === coaching.stage);
-                setSelectedStage(stageInfo);
-                setTheoryTab('theory');
-                setStep('theory_between');
-              } else {
-                const stageInfo = STAGES_THEORY[lang]?.find(s => s.id === stageId);
-                setSelectedStage(stageInfo);
-                setTheoryTab('theory');
-                setStep('theory_between');
-              }
-            }} style={{ width: '100%', background: '#1d4ed8', color: '#fff', border: 'none', borderRadius: 10, padding: 14, fontSize: 15, fontWeight: 700, cursor: 'pointer', marginBottom: 10 }}>
-              📚 {isKz ? '2-кезең: Теорияны оқу →' : '2 стадия: Изучить теорию →'}
+              const stageInfo = STAGES_THEORY[lang]?.find(s => s.id === stageId);
+              setSelectedStage(stageInfo);
+              setTheoryTab('theory');
+              setStep('theory_between');
+            }} style={{ width: '100%', background: '#1d4ed8', color: '#fff', border: 'none', borderRadius: 10, padding: 14, fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
+              📚 {isKz ? 'Теорияны оқу →' : 'Изучить теорию →'}
             </button>
           </div>
         </div>
       )}
 
-      {/* THEORY BETWEEN — Between practice 1 and 2 */}
+      {/* THEORY BETWEEN */}
       {step === 'theory_between' && selectedStage && (
         <div style={{ flex: 1, overflowY: 'auto', padding: '20px 16px' }}>
           <div style={{ maxWidth: 520, margin: '0 auto' }}>
-            <div style={{ background: '#1e3a5f', border: '1px solid #3b82f6', borderRadius: 12, padding: 14, marginBottom: 16, textAlign: 'center' }}>
-              <div style={{ fontSize: 13, color: '#93c5fd' }}>{isKz ? '2-кезең: Теория' : '2 стадия: Теория'}</div>
+            <div style={{ background: '#1e3a5f', border: '1px solid #3b82f6', borderRadius: 12, padding: 12, marginBottom: 16, textAlign: 'center' }}>
+              <div style={{ fontSize: 13, color: '#93c5fd', fontWeight: 700 }}>{isKz ? '2-кезең: Теория' : '2 стадия: Теория'}</div>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20 }}>
@@ -582,11 +618,7 @@ export default function Home() {
             </div>
 
             <div style={{ display: 'flex', gap: 4, background: '#0f172a', borderRadius: 10, padding: 4, marginBottom: 20 }}>
-              {[
-                { id: 'theory', label: '📖 ' + (isKz ? 'Теория' : 'Теория') },
-                { id: 'phrases', label: '💬 ' + (isKz ? 'Фразалар' : 'Фразы') },
-                { id: 'mistakes', label: '✗ ' + (isKz ? 'Қателер' : 'Ошибки') },
-              ].map(tab => (
+              {[{ id: 'theory', label: '📖 ' + (isKz ? 'Теория' : 'Теория') }, { id: 'phrases', label: '💬 ' + (isKz ? 'Фразалар' : 'Фразы') }, { id: 'mistakes', label: '✗ ' + (isKz ? 'Қателер' : 'Ошибки') }].map(tab => (
                 <button key={tab.id} onClick={() => setTheoryTab(tab.id)}
                   style={{ flex: 1, background: theoryTab === tab.id ? '#1e293b' : 'none', border: 'none', borderRadius: 8, padding: '8px 4px', fontSize: 12, color: theoryTab === tab.id ? '#e2e8f0' : '#64748b', cursor: 'pointer', fontWeight: theoryTab === tab.id ? 600 : 400 }}>
                   {tab.label}
@@ -604,7 +636,7 @@ export default function Home() {
                   <div style={{ fontSize: 11, color: '#f59e0b', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 10 }}>📖 {isKz ? 'ТЕОРИЯ' : 'ТЕОРИЯ'}</div>
                   <div style={{ fontSize: 14, color: '#e2e8f0', lineHeight: 1.9, whiteSpace: 'pre-line' }}>{selectedStage.theory}</div>
                 </div>
-                <div style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: 12, padding: 16, marginBottom: 14 }}>
+                <div style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: 12, padding: 16 }}>
                   <div style={{ fontSize: 11, color: '#10b981', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 12 }}>✅ {isKz ? 'ҚАДАМДАР' : 'ШАГИ'}</div>
                   {selectedStage.steps.map((s, i) => (
                     <div key={i} style={{ display: 'flex', gap: 12, marginBottom: 10 }}>
@@ -640,18 +672,18 @@ export default function Home() {
             )}
 
             <div style={{ background: '#0f172a', border: '1px solid #10b981', borderRadius: 12, padding: 18, textAlign: 'center', marginTop: 16 }}>
-              <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 6 }}>🚀 {isKz ? 'Теорияны үйрендіңіз!' : 'Теорию изучили!'}</div>
-              <div style={{ fontSize: 13, color: '#64748b', marginBottom: 14 }}>{isKz ? 'Енді үйренгеніңізді жаттығуда қолданыңыз' : 'Теперь применяйте знания на практике'}</div>
-              <button onClick={() => { setAttempt(2); startChat(stageId, 2); }}
+              <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 6 }}>🚀 {isKz ? 'Теорияны үйрендіңіз!' : 'Теорию изучили!'}</div>
+              <div style={{ fontSize: 13, color: '#64748b', marginBottom: 14 }}>{isKz ? 'Енді үйренгеніңізді қолданыңыз' : 'Теперь применяйте знания на практике'}</div>
+              <button onClick={() => { setAttempt(2); startChat(stageId, stageLabel, 2); }}
                 style={{ width: '100%', background: '#10b981', color: '#fff', border: 'none', borderRadius: 10, padding: 14, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
-                🚀 {isKz ? '3-кезең: Қайта жаттығу →' : '3 стадия: Практика снова →'}
+                🚀 {isKz ? 'Қайта жаттығу →' : 'Практика снова →'}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* RESULT 2 — After second attempt */}
+      {/* RESULT 2 */}
       {step === 'result2' && result1 && result2 && (
         <div style={{ flex: 1, overflowY: 'auto', padding: '20px 16px' }}>
           <div style={{ maxWidth: 500, margin: '0 auto' }}>
@@ -671,14 +703,13 @@ export default function Home() {
                 </div>
               </div>
               {result2.totalScore > result1.totalScore && (
-                <div style={{ textAlign: 'center', marginTop: 10, fontSize: 14, color: '#10b981', fontWeight: 600 }}>
+                <div style={{ textAlign: 'center', marginTop: 10, fontSize: 14, color: '#10b981', fontWeight: 700 }}>
                   +{result2.totalScore - result1.totalScore} {isKz ? 'балл өсті! 🎉' : 'балла роста! 🎉'}
                 </div>
               )}
             </div>
 
             <div style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: 12, padding: 16, marginBottom: 14 }}>
-              <div style={{ fontSize: 11, color: '#3b82f6', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 12 }}>{isKz ? 'ЕКІНШІ ЖАТТЫҒУ НӘТИЖЕСІ' : 'РЕЗУЛЬТАТ ВТОРОЙ ПРАКТИКИ'}</div>
               {[
                 { label: isKz ? '✓ Үздік сәт' : '✓ Лучший момент', text: result2.bestMoment, color: '#10b981' },
                 { label: isKz ? '✗ Басты қате' : '✗ Главная ошибка', text: result2.worstMoment, color: '#ef4444' },
@@ -690,7 +721,7 @@ export default function Home() {
                 </div>
               ))}
               {result2.detailedFeedback && (
-                <div style={{ paddingTop: 12, borderTop: '1px solid #1e293b', marginTop: 4 }}>
+                <div style={{ paddingTop: 12, borderTop: '1px solid #1e293b' }}>
                   <div style={{ fontSize: 11, color: '#3b82f6', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 6 }}>🎓 {isKz ? 'Нұрасылдың толық талдауы' : 'Подробный разбор Нурасыла'}</div>
                   <div style={{ fontSize: 14, color: '#e2e8f0', lineHeight: 1.8 }}>{result2.detailedFeedback}</div>
                 </div>
@@ -698,7 +729,7 @@ export default function Home() {
             </div>
 
             <button onClick={generateSummary} style={{ width: '100%', background: '#8b5cf6', color: '#fff', border: 'none', borderRadius: 10, padding: 14, fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
-              📋 {isKz ? '4-кезең: Резюме →' : '4 стадия: Резюме →'}
+              📋 {isKz ? 'Резюме →' : 'Резюме →'}
             </button>
           </div>
         </div>
@@ -708,20 +739,30 @@ export default function Home() {
       {step === 'loading_summary' && (
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 48, marginBottom: 16 }}>📋</div>
+            <div style={{ fontSize: 42, marginBottom: 16 }}>📋</div>
             <div style={{ fontSize: 14, color: '#3b82f6' }}>{isKz ? '⏳ Нұрасыл резюме дайындап жатыр...' : '⏳ Нурасыл готовит резюме...'}</div>
           </div>
         </div>
       )}
 
-      {/* SUMMARY — Stage 4 */}
+      {/* SUMMARY */}
       {step === 'summary' && summary && (
         <div style={{ flex: 1, overflowY: 'auto', padding: '20px 16px' }}>
           <div style={{ maxWidth: 500, margin: '0 auto' }}>
-            <div style={{ textAlign: 'center', marginBottom: 20 }}>
+            <div style={{ textAlign: 'center', marginBottom: 24 }}>
               <div style={{ fontSize: 42, marginBottom: 8 }}>🎓</div>
               <h2 style={{ fontSize: 22, fontWeight: 800, marginBottom: 4 }}>{isKz ? 'Оқу аяқталды!' : 'Обучение завершено!'}</h2>
-              <div style={{ fontSize: 13, color: '#64748b' }}>{isKz ? '4-кезең: Резюме' : '4 стадия: Резюме'}</div>
+              <div style={{ display: 'flex', justifyContent: 'center', gap: 16, marginTop: 12 }}>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: 28, fontWeight: 900, color: vc[result1?.verdict] || '#3b82f6' }}>{result1?.totalScore}</div>
+                  <div style={{ fontSize: 11, color: '#475569' }}>{isKz ? 'Бастапқы' : 'Начало'}</div>
+                </div>
+                <div style={{ fontSize: 20, color: '#475569', display: 'flex', alignItems: 'center' }}>→</div>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: 28, fontWeight: 900, color: vc[result2?.verdict] || '#10b981' }}>{result2?.totalScore}</div>
+                  <div style={{ fontSize: 11, color: '#475569' }}>{isKz ? 'Соңы' : 'Итог'}</div>
+                </div>
+              </div>
             </div>
 
             {[
@@ -738,7 +779,7 @@ export default function Home() {
             ))}
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 8 }}>
-              <button onClick={() => { setProblem(''); setBusiness(''); setCoaching(null); setResult1(null); setResult2(null); setSummary(null); setAttempt(1); setHistory([]); setResult(null); setStep('problem'); }}
+              <button onClick={() => { setProblem(''); setBusiness(''); setResult1(null); setResult2(null); setSummary(null); setAttempt(1); setHistory([]); setStep('problem'); }}
                 style={{ background: '#1e293b', color: '#e2e8f0', border: 'none', borderRadius: 10, padding: 14, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
                 {isKz ? '🔄 Жаңа мәселе' : '🔄 Новая проблема'}
               </button>
@@ -837,11 +878,10 @@ export default function Home() {
             )}
             <div style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: 12, padding: 18, textAlign: 'center', marginTop: 16 }}>
               <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 6 }}>🎯 {isKz ? 'Жаттығуға дайынсыз ба?' : 'Готовы практиковаться?'}</div>
-              <div style={{ fontSize: 13, color: '#64748b', marginBottom: 12 }}>{isKz ? 'Бизнесіңізді жазыңыз және жаттығуды бастаңыз' : 'Укажите ваш бизнес и начните практику'}</div>
               <input value={stageBusiness} onChange={e => setStageBusiness(e.target.value)}
                 placeholder={isKz ? 'Бизнесіңіз...' : 'Ваш бизнес...'}
                 style={{ width: '100%', background: '#0a0f1e', border: '1px solid #1e293b', borderRadius: 8, color: '#e2e8f0', fontSize: 14, padding: '10px 12px', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box', marginBottom: 12 }} />
-              <button onClick={() => { setBusiness(stageBusiness); startChat(selectedStage.id, 1); }}
+              <button onClick={() => { setBusiness(stageBusiness); startChat(selectedStage.id, selectedStage.label, 1); }}
                 disabled={!stageBusiness.trim()}
                 style={{ width: '100%', background: stageBusiness.trim() ? '#1d4ed8' : '#1e293b', color: '#fff', border: 'none', borderRadius: 10, padding: 14, fontSize: 14, fontWeight: 700, cursor: stageBusiness.trim() ? 'pointer' : 'default' }}>
                 ⚡ {isKz ? 'Жаттығуды бастау' : 'Начать практику'}
